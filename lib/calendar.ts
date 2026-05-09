@@ -505,12 +505,11 @@ export async function getAvailability(
       slots: displaySlots
     };
   } catch (error) {
+    console.error("Cal.com availability lookup failed", error);
     return {
       configured: true,
       message:
-        error instanceof Error
-          ? `I reached Cal.com, but availability lookup failed: ${error.message}`
-          : "I reached Cal.com, but availability lookup failed."
+        "I could not check Shubham's calendar just now. Please try again in a moment, or share another India-time window."
     };
   }
 }
@@ -591,12 +590,11 @@ export async function bookInterview(
       }
     };
   } catch (error) {
+    console.error("Cal.com booking failed", error);
     return {
       configured: true,
       message:
-        error instanceof Error
-          ? `I reached Cal.com, but booking failed: ${error.message}`
-          : "I reached Cal.com, but booking failed."
+        "I could not book the interview just now. Please try again in a moment, or choose another proposed slot."
     };
   }
 }

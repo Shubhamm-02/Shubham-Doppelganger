@@ -23,7 +23,7 @@ function hasActiveSchedulingFlow(
     return false;
   }
 
-  return /i can book an interview|i can help schedule|i still need|available interview slots|reply with the slot|book it end-to-end|could not find an open slot/i.test(
+  return /i can book an interview|i can help schedule|i still need|available interview slots|reply with the slot|book it end-to-end|could not find an open slot|could not check shubham's calendar|could not book the interview/i.test(
     latestAssistant
   );
 }
