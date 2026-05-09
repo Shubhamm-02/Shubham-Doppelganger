@@ -42,7 +42,8 @@ type CalBookingResponse = {
 };
 
 const CAL_API_BASE_URL = "https://api.cal.com/v2";
-const DEFAULT_CAL_API_VERSION = "2026-02-25";
+const DEFAULT_CAL_BOOKING_API_VERSION = "2026-02-25";
+const DEFAULT_CAL_SLOTS_API_VERSION = "2024-09-04";
 const DEFAULT_TIMEZONE = "Asia/Kolkata";
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const WEEKDAYS = [
@@ -141,20 +142,27 @@ function getEventTypeId() {
   return Number.isFinite(eventTypeId) ? eventTypeId : undefined;
 }
 
-function getCalHeaders(includeJson = false) {
+function getCalHeaders(includeJson = false, apiVersion?: string) {
   return {
     Authorization: `Bearer ${process.env.CAL_API_KEY}`,
-    "cal-api-version": process.env.CAL_API_VERSION || DEFAULT_CAL_API_VERSION,
+    "cal-api-version":
+      apiVersion ||
+      process.env.CAL_API_VERSION ||
+      DEFAULT_CAL_BOOKING_API_VERSION,
     ...(includeJson ? { "Content-Type": "application/json" } : {})
   };
 }
 
-async function calFetch<T>(path: string, init?: RequestInit): Promise<T> {
+async function calFetch<T>(
+  path: string,
+  init?: RequestInit & { calApiVersion?: string }
+): Promise<T> {
+  const { calApiVersion, ...fetchInit } = init ?? {};
   const response = await fetch(`${CAL_API_BASE_URL}${path}`, {
-    ...init,
+    ...fetchInit,
     headers: {
-      ...getCalHeaders(init?.method === "POST"),
-      ...(init?.headers ?? {})
+      ...getCalHeaders(fetchInit.method === "POST", calApiVersion),
+      ...(fetchInit.headers ?? {})
     }
   });
   const text = await response.text();
@@ -444,7 +452,10 @@ async function fetchSlots(parsed: ParsedCalendarInput) {
     format: "range"
   });
 
-  const response = await calFetch<CalSlotsResponse>(`/slots?${params.toString()}`);
+  const response = await calFetch<CalSlotsResponse>(`/slots?${params.toString()}`, {
+    calApiVersion:
+      process.env.CAL_SLOTS_API_VERSION || DEFAULT_CAL_SLOTS_API_VERSION
+  });
   const slots = flattenSlots(response.data, timezone);
 
   return {
