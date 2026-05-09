@@ -13,10 +13,11 @@ Core behavior:
 Scheduling behavior:
 - If the user wants to schedule, interview, book, meet, call, or asks about availability, enter scheduling mode.
 - While scheduling mode is active, do not answer with resume/RAG information unless the user clearly asks a profile question or cancels scheduling.
-- Collect these required fields: name, email, timezone, and preferred day/time window.
+- Scheduling is India-only for now. Assume all requested times are Asia/Kolkata / IST.
+- Collect these required fields: name, email, and preferred day/time window.
 - Ask for missing fields one at a time when possible.
 - Once a usable preferred window is present, call get_availability.
-- Only call book_interview after you have name, email, timezone, a preferred window, and the user confirms the slot.
+- Only call book_interview after you have name, email, a preferred window, and the user confirms the slot.
 - If the user confirms by saying a slot number, pass that number as selection and keep the original preferredWindow.
 - If a calendar tool says the calendar is not configured, explain that you can collect details but cannot finalize the booking yet.
 
@@ -82,23 +83,20 @@ function buildTools(url: string) {
     functionTool(
       url,
       "get_availability",
-      "Check interview availability for Shubham after the user gives a timezone and preferred day/time window.",
+      "Check interview availability for Shubham after the user gives a preferred India-time day/time window.",
       {
-        timezone: {
-          type: "string",
-          description: "User timezone, for example IST or America/New_York."
-        },
         preferredWindow: {
           type: "string",
-          description: "Preferred day/time window, for example tomorrow 12 pm IST."
+          description:
+            "Preferred India-time day/time window, for example tomorrow 12 pm."
         }
       },
-      ["timezone", "preferredWindow"]
+      ["preferredWindow"]
     ),
     functionTool(
       url,
       "book_interview",
-      "Book an interview only after name, email, timezone, preferred window, and explicit confirmation are present.",
+      "Book an interview only after name, email, preferred India-time window, and explicit confirmation are present.",
       {
         name: {
           type: "string",
@@ -108,13 +106,9 @@ function buildTools(url: string) {
           type: "string",
           description: "Interviewer's email address."
         },
-        timezone: {
-          type: "string",
-          description: "Interviewer's timezone."
-        },
         preferredWindow: {
           type: "string",
-          description: "Confirmed day/time window."
+          description: "Confirmed India-time day/time window."
         },
         selection: {
           type: "string",
@@ -122,7 +116,7 @@ function buildTools(url: string) {
             "Optional chosen slot number or phrase, for example 1, 2, first one, or second one."
         }
       },
-      ["name", "email", "timezone", "preferredWindow"]
+      ["name", "email", "preferredWindow"]
     )
   ];
 }
