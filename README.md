@@ -14,7 +14,7 @@ Day 3 scaffold is in progress:
 - Supabase document upsert and vector retrieval are implemented.
 - Local chunk search remains as a fallback when env keys are missing.
 - Vapi web calls are wired. Assistant tool configuration is handled by `npm run vapi:configure`.
-- Cal.com integration points exist, but live availability/booking still need final API wiring.
+- Cal.com availability and booking are wired through `/api/calendar/*` and Vapi tools.
 
 The app is not production-ready yet. The next manual step is to run the Supabase schema, add real keys to `.env.local`, and run ingestion.
 
@@ -47,10 +47,7 @@ http://localhost:3000
 ## Data Sources
 
 - `data/resume.md`
-- `data/project-notes/cli-agent.md`
-- `data/project-notes/pdf-grounded-chatbot.md`
-- `data/project-notes/comment-ai.md`
-- `data/project-notes/ccpa-compliance-system.md`
+- `data/project-notes/*.md`
 
 `data/resume.md` is the ingestion source. A matching PDF can be kept for humans, but the RAG pipeline does not need it.
 
