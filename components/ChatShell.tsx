@@ -85,6 +85,7 @@ export function ChatShell() {
   >("idle");
   const [voiceError, setVoiceError] = useState("");
   const [schedulingMode, setSchedulingMode] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const vapiRef = useRef<Vapi | null>(null);
 
   const vapiPublicKey = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
@@ -271,8 +272,12 @@ export function ChatShell() {
     }
   }
 
-  async function copyMessage(content: string) {
+  async function copyMessage(messageId: string, content: string) {
     await navigator.clipboard.writeText(content);
+    setCopiedMessageId(messageId);
+    window.setTimeout(() => {
+      setCopiedMessageId((current) => (current === messageId ? null : current));
+    }, 1600);
   }
 
   function startPrompt(prompt: string) {
@@ -501,12 +506,21 @@ export function ChatShell() {
                 <button
                   type="button"
                   className="copy-message"
-                  aria-label="Copy message"
-                  onClick={() => copyMessage(message.content)}
+                  data-copied={copiedMessageId === message.id ? "true" : "false"}
+                  aria-label={
+                    copiedMessageId === message.id ? "Message copied" : "Copy message"
+                  }
+                  onClick={() => copyMessage(message.id, message.content)}
                 >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M8 7a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-1v1a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3h1V7Zm2 1h3a3 3 0 0 1 3 3v3h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v1Zm-3 2a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H7Z" />
-                  </svg>
+                  {copiedMessageId === message.id ? (
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M9.55 16.2 5.8 12.45a1 1 0 1 0-1.42 1.42l4.46 4.46a1 1 0 0 0 1.42 0L20.03 8.56a1 1 0 1 0-1.42-1.42L9.55 16.2Z" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M8 7a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-1v1a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3h1V7Zm2 1h3a3 3 0 0 1 3 3v3h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v1Zm-3 2a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H7Z" />
+                    </svg>
+                  )}
                 </button>
               </div>
               <div className="bubble-body">{message.content}</div>
