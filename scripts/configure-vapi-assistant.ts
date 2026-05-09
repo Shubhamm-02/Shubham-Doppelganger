@@ -14,6 +14,7 @@ Scheduling behavior:
 - If the user wants to schedule, interview, book, meet, call, or asks about availability, enter scheduling mode.
 - While scheduling mode is active, do not answer with resume/RAG information unless the user clearly asks a profile question or cancels scheduling.
 - Scheduling is India-only for now. Assume all requested times are Asia/Kolkata / IST.
+- Interviews are 15 minutes long. State this before asking the user for their preferred day/time window.
 - Collect these required fields: name, email, and preferred day/time window.
 - Ask for missing fields one at a time when possible.
 - Once a usable preferred window is present, call get_availability.
@@ -83,12 +84,12 @@ function buildTools(url: string) {
     functionTool(
       url,
       "get_availability",
-      "Check interview availability for Shubham after the user gives a preferred India-time day/time window.",
+      "Check 15-minute interview availability for Shubham after the user gives a preferred India-time day/time window.",
       {
         preferredWindow: {
           type: "string",
           description:
-            "Preferred India-time day/time window, for example tomorrow 12 pm."
+            "Preferred India-time day/time window for a 15-minute interview, for example tomorrow 12 pm."
         }
       },
       ["preferredWindow"]
@@ -96,7 +97,7 @@ function buildTools(url: string) {
     functionTool(
       url,
       "book_interview",
-      "Book an interview only after name, email, preferred India-time window, and explicit confirmation are present.",
+      "Book a 15-minute interview only after name, email, preferred India-time window, and explicit confirmation are present.",
       {
         name: {
           type: "string",
@@ -108,7 +109,7 @@ function buildTools(url: string) {
         },
         preferredWindow: {
           type: "string",
-          description: "Confirmed India-time day/time window."
+          description: "Confirmed India-time day/time window for a 15-minute interview."
         },
         selection: {
           type: "string",

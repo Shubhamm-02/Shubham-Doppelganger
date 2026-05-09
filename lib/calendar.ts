@@ -399,14 +399,14 @@ function extractSlotSelection(input: Record<string, unknown>) {
 
 function formatSlotsMessage(slots: CalendarSlot[], preferredWindow: string) {
   if (!slots.length) {
-    return `I checked Shubham's calendar for ${preferredWindow}, but I could not find an open slot there. Please share another day/time window.`;
+    return `I checked Shubham's calendar for a 15-minute interview during ${preferredWindow}, but I could not find an open slot there. Please share another day/time window.`;
   }
 
   const formatted = slots
     .map((slot, index) => `${index + 1}. ${slot.label}`)
     .join("\n");
 
-  return `I found these available interview slots for ${preferredWindow}:\n\n${formatted}\n\nReply with the slot number or say "book the first one" and I will confirm it.`;
+  return `I found these available 15-minute interview slots for ${preferredWindow}:\n\n${formatted}\n\nReply with the slot number or say "book the first one" and I will confirm it.`;
 }
 
 function formatDateKey(dateKey: string) {
@@ -550,7 +550,7 @@ export async function bookInterview(
       return {
         configured: true,
         message:
-          "I could not find an available slot in that window, so I did not create a booking. Please share another time window."
+          "I could not find an available 15-minute slot in that window, so I did not create a booking. Please share another time window."
       };
     }
 
