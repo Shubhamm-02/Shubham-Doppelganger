@@ -101,10 +101,11 @@ export function ChatShell() {
   useEffect(() => {
     let cancelled = false;
 
-    const stored =
+    const storedValue =
       typeof window !== "undefined"
-        ? Number(window.localStorage.getItem("va.activeSessionId") ?? "")
-        : NaN;
+        ? window.localStorage.getItem("va.activeSessionId")
+        : null;
+    const stored = Number(storedValue ?? "");
 
     fetch("/api/sessions?limit=20")
       .then((res) => res.json())
@@ -113,14 +114,16 @@ export function ChatShell() {
         const rows = Array.isArray(payload?.sessions) ? payload.sessions : [];
         setSessions(rows);
 
-        const nextSessionId =
-          Number.isFinite(stored) && stored > 0 ? stored : rows?.[0]?.id ?? null;
-        if (nextSessionId) setActiveSessionId(nextSessionId);
+        if (storedValue !== null && Number.isFinite(stored) && stored > 0) {
+          setActiveSessionId(stored);
+        }
       })
       .catch(() => {
         if (cancelled) return;
         setSessions([]);
-        if (Number.isFinite(stored) && stored > 0) setActiveSessionId(stored);
+        if (storedValue !== null && Number.isFinite(stored) && stored > 0) {
+          setActiveSessionId(stored);
+        }
       });
 
     return () => {
@@ -130,11 +133,13 @@ export function ChatShell() {
 
   useEffect(() => {
     if (!activeSessionId) return;
+    let cancelled = false;
     window.localStorage.setItem("va.activeSessionId", String(activeSessionId));
 
     fetch(`/api/conversations?limit=60&channel=chat&sessionId=${activeSessionId}`)
       .then((res) => res.json())
       .then((payload) => {
+        if (cancelled) return;
         const rows: ConversationRow[] = Array.isArray(payload?.conversations)
           ? payload.conversations
           : [];
@@ -175,6 +180,10 @@ export function ChatShell() {
         );
       })
       .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeSessionId]);
 
   useEffect(() => {
@@ -382,7 +391,8 @@ export function ChatShell() {
 
           <button className="rail-new-chat" type="button" onClick={resetChat}>
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 4a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5a1 1 0 0 1 1-1Z" />
+              <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.375 2.625a1 1 0 0 1 3 3L12 15l-4 1 1-4 9.375-9.375Z" />
             </svg>
             <span>New chat</span>
           </button>

@@ -88,6 +88,7 @@ textarea {
 .rail-top {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 10px;
 }
 
@@ -99,7 +100,8 @@ textarea {
 }
 
 .rail-collapsed .rail-header {
-  grid-template-columns: 1fr;
+  grid-template-columns: 44px;
+  justify-content: center;
 }
 
 .rail:not(.rail-collapsed) .rail-header {
@@ -162,6 +164,12 @@ textarea {
   transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
 }
 
+.rail-collapsed .rail-btn {
+  width: 44px;
+  justify-self: center;
+  align-self: center;
+}
+
 .rail-btn svg {
   width: 22px;
   height: 22px;
@@ -179,7 +187,7 @@ textarea {
 }
 
 .rail-new-chat {
-  width: 100%;
+  width: 44px;
   height: 44px;
   border: 1px solid transparent;
   border-radius: 12px;
@@ -192,13 +200,18 @@ textarea {
   padding: 0;
   cursor: pointer;
   overflow: hidden;
+  align-self: center;
   transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
 }
 
 .rail-new-chat svg {
-  width: 22px;
-  height: 22px;
-  fill: currentColor;
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   opacity: 0.92;
   flex: none;
 }
@@ -214,6 +227,8 @@ textarea {
 }
 
 .rail:not(.rail-collapsed) .rail-new-chat {
+  width: 100%;
+  align-self: stretch;
   justify-content: flex-start;
   padding: 0 14px;
   background: rgba(255, 255, 255, 0.075);
