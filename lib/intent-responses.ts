@@ -164,7 +164,7 @@ export async function calendarIntentResponse(
       answer:
         `Got it${known.length ? ` (${known.join(", ")})` : ""}. ` +
         `I still need ${details.missing.join(", ")} before I can propose or book a 15-minute slot.` +
-        "\n\nExample: abc, abc@example.com, May 10.",
+        "\n\nExample: abc, abc@example.com, tomorrow.",
       citations: [],
       grounded: true,
       retrievalMode: "local-keyword"

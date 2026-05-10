@@ -130,6 +130,8 @@ const ORDINAL_DAY_PATTERN = Object.keys(ORDINAL_DAYS)
   .sort((first, second) => second.length - first.length)
   .join("|");
 const DAY_VALUE_PATTERN = `(?:\\d{1,2}(?:st|nd|rd|th)?|${ORDINAL_DAY_PATTERN})`;
+const NAME_REJECT_PATTERN =
+  /\b(book|schedule|set\s*up|call|meet|meeting|interview|slot|availability|available|calendar|email|mail|gmail|phone|number|timezone|ist|utc|gmt|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun|jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december|option|first|second|third|yes|yep|yeah|confirm|confirmed|received)\b/i;
 
 function isCalendarConfigured() {
   return Boolean(process.env.CAL_API_KEY && process.env.CAL_EVENT_TYPE_ID);
@@ -171,7 +173,7 @@ function parseCalendarInput(input: Record<string, unknown>): ParsedCalendarInput
 
   return {
     name: stringValue(input, "name") || extractName(text),
-    email: stringValue(input, "email") || text.match(EMAIL_PATTERN)?.[0],
+    email: stringValue(input, "email") || extractLatestEmail(text),
     emailConfirmed:
       booleanValue(input, "emailConfirmed") ||
       booleanValue(input, "confirmedEmail"),
@@ -180,6 +182,10 @@ function parseCalendarInput(input: Record<string, unknown>): ParsedCalendarInput
     slotStart: stringValue(input, "slotStart") || stringValue(input, "start"),
     text
   };
+}
+
+function extractLatestEmail(text: string) {
+  return [...text.matchAll(new RegExp(EMAIL_PATTERN, "gi"))].at(-1)?.[0];
 }
 
 function extractName(text: string) {
@@ -195,13 +201,36 @@ function extractName(text: string) {
     .find(Boolean);
   if (knownName) return knownName;
 
-  return undefined;
+  return extractStandaloneName(text);
 }
 
 function cleanName(name: string) {
   return name
     .replace(/\b(email|timezone|ist|utc|gmt|tomorrow|today|at|on)\b.*$/i, "")
     .trim();
+}
+
+function extractStandaloneName(text: string) {
+  for (const line of text.split(/\n+/)) {
+    const clean = cleanName(line)
+      .replace(EMAIL_PATTERN, " ")
+      .replace(/[^a-z\s.'-]/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!clean || NAME_REJECT_PATTERN.test(clean)) continue;
+
+    const words = clean.split(/\s+/).filter(Boolean);
+    if (
+      words.length >= 1 &&
+      words.length <= 4 &&
+      words.every((word) => word.length > 1)
+    ) {
+      return clean;
+    }
+  }
+
+  return undefined;
 }
 
 function getEventTypeId() {
@@ -320,7 +349,7 @@ function bookingFailureMessage(error: unknown) {
     return "Cal.com rejected the attendee details. Please use the interviewer's real email address and try again.";
   }
 
-  return "Cal.com rejected the booking. The calendar is connected, so please use the interviewer's email address instead of Shubham's email and try the same slot again.";
+  return "Cal.com rejected the booking. Please choose one of the latest shown options and use the interviewer's email address.";
 }
 
 function dateKeyForTimeZone(date: Date, timezone: string) {
@@ -378,48 +407,59 @@ function dateKeyFromMonthDay(
 function extractTargetDateKey(text: string, timezone: string) {
   const lower = text.toLowerCase();
   const today = dateKeyForTimeZone(new Date(), timezone);
+  const candidates: Array<{ index: number; dateKey: string }> = [];
 
-  if (/\b(day after tomorrow|day after tmrw)\b/i.test(text)) return addDays(today, 2);
-  if (/\btoday\b/i.test(text)) return today;
-  if (/\btomorrow\b/i.test(text)) return addDays(today, 1);
+  for (const match of lower.matchAll(/\b(day after tomorrow|day after tmrw|today|tomorrow)\b/gi)) {
+    const phrase = match[1];
+    const dateKey =
+      phrase === "today"
+        ? today
+        : phrase === "tomorrow"
+          ? addDays(today, 1)
+          : addDays(today, 2);
+    candidates.push({ index: match.index ?? 0, dateKey });
+  }
 
-  const isoDate = lower.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/);
-  if (isoDate) {
+  for (const isoDate of lower.matchAll(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/g)) {
     const [, year, month, day] = isoDate;
-    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+    candidates.push({
+      index: isoDate.index ?? 0,
+      dateKey: `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
+    });
   }
 
-  const monthDate = lower.match(
-    new RegExp(
-      `\\b(${MONTH_NAME_PATTERN})\\s+(${DAY_VALUE_PATTERN})(?:,?\\s*(20\\d{2}))?\\b`,
-      "i"
-    )
+  const monthDatePattern = new RegExp(
+    `\\b(${MONTH_NAME_PATTERN})\\s+(${DAY_VALUE_PATTERN})(?:,?\\s*(20\\d{2}))?\\b`,
+    "gi"
   );
-  if (monthDate) {
+  for (const monthDate of lower.matchAll(monthDatePattern)) {
     const [, monthName, day, year] = monthDate;
-    return dateKeyFromMonthDay(monthName, day, year, timezone);
+    const dateKey = dateKeyFromMonthDay(monthName, day, year, timezone);
+    if (dateKey) candidates.push({ index: monthDate.index ?? 0, dateKey });
   }
 
-  const dayMonthDate = lower.match(
-    new RegExp(
-      `\\b(${DAY_VALUE_PATTERN})(?:\\s+of)?\\s+(${MONTH_NAME_PATTERN})(?:,?\\s*(20\\d{2}))?\\b`,
-      "i"
-    )
+  const dayMonthDatePattern = new RegExp(
+    `\\b(${DAY_VALUE_PATTERN})(?:\\s+of)?\\s+(${MONTH_NAME_PATTERN})(?:,?\\s*(20\\d{2}))?\\b`,
+    "gi"
   );
-  if (dayMonthDate) {
+  for (const dayMonthDate of lower.matchAll(dayMonthDatePattern)) {
     const [, day, monthName, year] = dayMonthDate;
-    return dateKeyFromMonthDay(monthName, day, year, timezone);
+    const dateKey = dateKeyFromMonthDay(monthName, day, year, timezone);
+    if (dateKey) candidates.push({ index: dayMonthDate.index ?? 0, dateKey });
   }
 
-  const weekday = WEEKDAYS.find((day) => lower.includes(day.slice(0, 3)));
-  if (weekday) {
-    const targetDay = WEEKDAYS.indexOf(weekday);
-    const currentDay = new Date(`${today}T00:00:00.000Z`).getUTCDay();
-    const daysUntil = (targetDay - currentDay + 7) % 7 || 7;
-    return addDays(today, daysUntil);
+  for (const weekday of WEEKDAYS) {
+    for (const match of lower.matchAll(
+      new RegExp(`\\b${weekday.slice(0, 3)}(?:${weekday.slice(3)})?\\b`, "gi")
+    )) {
+      const targetDay = WEEKDAYS.indexOf(weekday);
+      const currentDay = new Date(`${today}T00:00:00.000Z`).getUTCDay();
+      const daysUntil = (targetDay - currentDay + 7) % 7 || 7;
+      candidates.push({ index: match.index ?? 0, dateKey: addDays(today, daysUntil) });
+    }
   }
 
-  return undefined;
+  return candidates.sort((first, second) => first.index - second.index).at(-1)?.dateKey;
 }
 
 function toMinutes(hourValue: string, minuteValue = "0", meridian?: string) {
@@ -559,6 +599,7 @@ function chooseDisplaySlots(
       (slot) => localSlotInfo(slot.start, timezone).dateKey === targetDateKey
     );
     if (sameDay.length) return sameDay.slice(0, 3);
+    return [];
   }
 
   return slots.slice(0, 3);
