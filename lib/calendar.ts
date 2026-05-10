@@ -193,7 +193,20 @@ async function calFetch<T>(
 function extractCalError(payload: unknown) {
   if (!payload || typeof payload !== "object") return "unknown error";
   const record = payload as Record<string, unknown>;
-  const message = record.message || record.error;
+  const error = record.error;
+  const details =
+    error && typeof error === "object"
+      ? (error as Record<string, unknown>).details
+      : undefined;
+  const nestedMessage =
+    error && typeof error === "object"
+      ? (error as Record<string, unknown>).message
+      : undefined;
+  const detailMessage =
+    details && typeof details === "object"
+      ? (details as Record<string, unknown>).message
+      : undefined;
+  const message = record.message || nestedMessage || detailMessage || record.error;
   if (typeof message === "string") return message;
   return JSON.stringify(payload).slice(0, 500);
 }
@@ -588,11 +601,16 @@ export async function bookInterview(
       body: JSON.stringify({
         start: new Date(selectedSlot.start).toISOString(),
         eventTypeId,
+        lengthInMinutes: 15,
         attendee: {
           name: parsed.name,
           email: parsed.email,
           timeZone: timezone,
           language: "en"
+        },
+        bookingFieldsResponses: {
+          title: `Interview with ${parsed.name}`,
+          notes: "Booked by Wizard, Shubham Shah's AI representative."
         },
         metadata: {
           source: "shubham-ai-representative",

@@ -100,6 +100,18 @@ export function loadProfileSources(): ProfileSource[] {
     });
   }
 
+  const personalBackgroundFile = dataPath("personal-background.md");
+  if (existsSync(personalBackgroundFile)) {
+    const content = readFileSync(personalBackgroundFile, "utf8");
+    sources.push({
+      id: "personal-background",
+      title: titleFromMarkdown(content, "Personal Background"),
+      kind: "project-note",
+      relativePath: "data/personal-background.md",
+      content
+    });
+  }
+
   const projectNotesDir = dataPath("project-notes");
   if (existsSync(projectNotesDir)) {
     for (const fileName of readdirSync(projectNotesDir).sort()) {
