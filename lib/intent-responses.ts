@@ -5,7 +5,7 @@ import { isKnownCallerName } from "@/lib/scheduling-names";
 
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const DATE_PATTERN =
-  /\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/i;
+  /\b(today|tomorrow|day after tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|fifteenth|sixteenth|seventeenth|eighteenth|nineteenth|twentieth|twenty first|twenty second|twenty third|twenty fourth|twenty fifth|twenty sixth|twenty seventh|twenty eighth|twenty ninth|thirtieth|thirty first)\b/i;
 const TIME_PATTERN = /\b(\d{1,2})(:\d{2})?\s*(am|pm)\b|\b\d{1,2}\s*-\s*\d{1,2}\b/i;
 const SCHEDULING_COMMAND_PATTERN =
   /\b(book|schedule|set\s*up|call|meet|meeting|interview|slot|availability|available|calendar)\b/i;
@@ -80,7 +80,6 @@ function summarizeSchedulingDetails(message: string) {
   if (!hasName) missing.push("your name");
   if (!email) missing.push("your email");
   if (!hasDate) missing.push("the day/date");
-  if (!hasSpecificTime) missing.push("a preferred 15-minute time");
 
   return { email, hasDate, hasName, hasSpecificTime, missing };
 }
@@ -93,7 +92,7 @@ export async function calendarIntentResponse(
   const details = summarizeSchedulingDetails(message);
 
   if (intent === "availability") {
-    if (message && details.hasDate && details.hasSpecificTime) {
+    if (message && details.hasDate) {
       const calendarResult = await getAvailability({
         text: message,
         preferredWindow: message
@@ -109,10 +108,28 @@ export async function calendarIntentResponse(
 
     return {
       answer:
-        "I can help schedule a 15-minute interview in India time. Share a preferred day and exact 15-minute time, for example tomorrow 3:00 pm or tomorrow 3:00-3:15 pm.",
+        "I can help schedule a 15-minute interview. Which day should I check? You can say tomorrow, day after tomorrow, May 11, or eleventh May.",
       citations: [],
       grounded: true,
       retrievalMode: "local-keyword"
+    };
+  }
+
+  if (
+    message &&
+    details.hasDate &&
+    !isBookingConfirmation(latestMessage)
+  ) {
+    const calendarResult = await getAvailability({
+      text: message,
+      preferredWindow: message
+    });
+
+    return {
+      answer: calendarResult.message,
+      citations: [],
+      grounded: true,
+      retrievalMode: calendarResult.configured ? "calendar" : "local-keyword"
     };
   }
 
@@ -136,15 +153,14 @@ export async function calendarIntentResponse(
     const known = [
       details.email ? `email: ${details.email}` : null,
       details.hasName ? "name: received" : null,
-      details.hasDate ? "day/date: received" : null,
-      details.hasSpecificTime ? "15-minute time: received" : null
+      details.hasDate ? "day/date: received" : null
     ].filter(Boolean);
 
     return {
       answer:
         `Got it${known.length ? ` (${known.join(", ")})` : ""}. ` +
         `I still need ${details.missing.join(", ")} before I can propose or book a 15-minute slot.` +
-        "\n\nExample: Shubham Shah, shubham@example.com, tomorrow 3:00 pm.",
+        "\n\nExample: Shubham Shah, shubham@example.com, May 11.",
       citations: [],
       grounded: true,
       retrievalMode: "local-keyword"
@@ -153,7 +169,7 @@ export async function calendarIntentResponse(
 
   return {
     answer:
-      "I can book a 15-minute interview in India time. Please share:\n\n1. Your name\n2. Your email (needed for the calendar invite)\n3. A preferred day and exact 15-minute time\n\nThen I will check availability and book it end-to-end.",
+      "I can book a 15-minute interview. First, which day should I check? You can say tomorrow, day after tomorrow, May 11, or eleventh May.",
     citations: [],
     grounded: true,
     retrievalMode: "local-keyword"

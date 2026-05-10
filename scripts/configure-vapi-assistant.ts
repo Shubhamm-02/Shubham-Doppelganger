@@ -14,16 +14,20 @@ Core behavior:
 Scheduling behavior:
 - If the user wants to schedule, interview, book, meet, call, or asks about availability, enter scheduling mode.
 - While scheduling mode is active, do not answer with resume/RAG information unless the user clearly asks a profile question or cancels scheduling.
-- Scheduling is India-only for now. Assume all requested times are Asia/Kolkata / IST.
-- Interviews are 15 minutes long. State this before asking the user for their preferred day and exact 15-minute time.
-- Collect these required fields: name, email, and preferred day with an exact 15-minute time.
+- Scheduling is India-only for now. Assume all requested days/times are Asia/Kolkata.
+- Do not say "IST" after every time. Say India time once if needed, then speak naturally.
+- Never interpret a requested time as EST/PST/etc. Treat it as India time.
+- Interviews are 15 minutes long.
+- First ask only for the preferred day/date. Accept phrases like tomorrow, day after tomorrow, May 11, 11 May, or eleventh May.
+- After the caller gives a day/date, call get_availability. It returns up to three available 15-minute slots.
+- Read the slots as simple numbered options, then ask the caller to choose 1, 2, or 3.
+- After the caller chooses a slot, collect any missing booking details: name, email, and email confirmation.
 - After the caller gives an email address, read it back and ask them to confirm it is correct before booking.
 - Ask for missing fields one at a time when possible.
-- Once a usable preferred day and exact time is present, call get_availability.
-- Only call book_interview after you have name, email, email confirmation, and the user confirms a slot.
+- Only call book_interview after you have a selected slotStart from get_availability, name, email, and email confirmation.
 - If get_availability returns bookingSlots, speak only spokenMessage and keep bookingSlots internally for booking.
-- If the caller chooses a slot, call book_interview with the selected bookingSlots item's slotStart, plus selection, name, email, emailConfirmed=true, and the original preferredWindow if available.
-- If the user confirms by saying a slot number, pass that number as selection.
+- If the caller chooses a slot, call book_interview with the selected bookingSlots item's slotStart, plus selection, name, email, emailConfirmed=true, and the original preferred day/date as preferredWindow.
+- If the user says an incomplete phrase like "book the", ask which slot number they want instead of guessing.
 - If a calendar tool says the calendar is not configured, explain that you can collect details but cannot finalize the booking yet.
 
 Tool result rule:
@@ -144,12 +148,12 @@ function buildTools(url: string) {
     functionTool(
       url,
       "get_availability",
-      "Check 15-minute interview availability for Shubham after the user gives a preferred India-time day and exact 15-minute time.",
+      "Check 15-minute interview availability for Shubham after the user gives a preferred India-time day/date.",
       {
         preferredWindow: {
           type: "string",
           description:
-            "Preferred India-time day and exact 15-minute time, for example tomorrow 12 pm or tomorrow 12:00-12:15 pm."
+            "Preferred India-time day/date, for example tomorrow, day after tomorrow, May 11, 11 May, or eleventh May."
         }
       },
       ["preferredWindow"]
@@ -157,7 +161,7 @@ function buildTools(url: string) {
     functionTool(
       url,
       "book_interview",
-      "Book a 15-minute interview only after name, email, preferred India-time day/exact time, and explicit confirmation are present.",
+      "Book a selected 15-minute interview slot only after a slotStart from get_availability, name, email, and explicit email confirmation are present.",
       {
         name: {
           type: "string",
@@ -174,7 +178,7 @@ function buildTools(url: string) {
         },
         preferredWindow: {
           type: "string",
-          description: "Confirmed India-time day and exact 15-minute time for the interview."
+          description: "Original preferred India-time day/date used for availability lookup."
         },
         slotStart: {
           type: "string",
@@ -187,7 +191,7 @@ function buildTools(url: string) {
             "Optional chosen slot number or phrase, for example 1, 2, first one, or second one."
         }
       },
-      ["name", "email", "emailConfirmed", "preferredWindow"]
+      ["name", "email", "emailConfirmed", "preferredWindow", "slotStart"]
     )
   ];
 }
