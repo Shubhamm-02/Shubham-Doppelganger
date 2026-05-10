@@ -50,7 +50,10 @@ const CAL_API_BASE_URL = "https://api.cal.com/v2";
 const DEFAULT_CAL_BOOKING_API_VERSION = "2026-02-25";
 const DEFAULT_CAL_SLOTS_API_VERSION = "2024-09-04";
 const DEFAULT_TIMEZONE = "Asia/Kolkata";
-const DEFAULT_HOST_EMAILS = ["shubhamshah473@gmail.com"];
+const DEFAULT_HOST_EMAILS = [
+  "shubhamshah473@gmail.com",
+  "shubhammmm51@gmail.com"
+];
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const WEEKDAYS = [
   "sunday",
@@ -317,7 +320,7 @@ function bookingFailureMessage(error: unknown) {
     return "Cal.com rejected the attendee details. Please use the interviewer's real email address and try again.";
   }
 
-  return "Cal.com rejected the booking just now. Please try another proposed slot, or use a different attendee email.";
+  return "Cal.com rejected the booking. The calendar is connected, so please use the interviewer's email address instead of Shubham's email and try the same slot again.";
 }
 
 function dateKeyForTimeZone(date: Date, timezone: string) {
@@ -572,7 +575,7 @@ function extractSlotSelection(input: Record<string, unknown>) {
 }
 
 function hasSlotSelectionText(text: string) {
-  return /^\s*[1-3]\s*$|\b(first|second|third|slot\s*[1-3]|book\s+(the\s+)?(first|second|third))\b/i.test(
+  return /(^|\n)\s*[1-3]\s*(\n|$)|\b(first|second|third|slot\s*[1-3]|book\s+(the\s+)?(first|second|third))\b/i.test(
     text
   );
 }
