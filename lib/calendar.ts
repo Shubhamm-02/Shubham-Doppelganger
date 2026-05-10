@@ -1,3 +1,5 @@
+import { findKnownCallerName } from "@/lib/scheduling-names";
+
 type CalendarSlot = {
   start: string;
   end?: string;
@@ -141,6 +143,12 @@ function extractName(text: string) {
     text.match(/\bthis is\s+([A-Z][A-Za-z.'-]*(?:\s+[A-Z][A-Za-z.'-]*){0,3})/i)?.[1];
 
   if (explicit) return cleanName(explicit);
+  const knownName = text
+    .split(/\n+/)
+    .map((line) => findKnownCallerName(cleanName(line)))
+    .find(Boolean);
+  if (knownName) return knownName;
+
   return undefined;
 }
 
@@ -425,7 +433,7 @@ function extractSlotSelection(input: Record<string, unknown>) {
 
 function formatSlotsMessage(slots: CalendarSlot[], preferredWindow: string) {
   if (!slots.length) {
-    return `I checked Shubham's calendar for a 15-minute interview during ${preferredWindow}, but I could not find an open slot there. Please share another day/time window.`;
+    return `I checked Shubham's calendar for a 15-minute interview at ${preferredWindow}, but I could not find an open slot there. Please share another exact 15-minute time.`;
   }
 
   const formatted = slots
@@ -506,7 +514,7 @@ function missingBookingFields(parsed: ParsedCalendarInput) {
     !parsed.preferredWindow &&
     !extractTargetDateKey(parsed.text, DEFAULT_TIMEZONE)
   ) {
-    missing.push("preferred day/time window");
+    missing.push("preferred day and exact 15-minute time");
   }
   if (!extractPreferredTimeWindow(`${parsed.text}\n${parsed.preferredWindow ?? ""}`)) {
     missing.push("specific time");
@@ -541,7 +549,7 @@ export async function getAvailability(
     return {
       configured: true,
       message:
-        "I could not check Shubham's calendar just now. Please try again in a moment, or share another India-time window."
+        "I could not check Shubham's calendar just now. Please try again in a moment, or share another exact India-time 15-minute slot."
     };
   }
 }
@@ -592,7 +600,7 @@ export async function bookInterview(
       return {
         configured: true,
         message:
-          "I could not find an available 15-minute slot in that window, so I did not create a booking. Please share another time window."
+          "I could not find an available 15-minute slot at that time, so I did not create a booking. Please share another exact 15-minute time."
       };
     }
 
