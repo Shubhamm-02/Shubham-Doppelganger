@@ -35,7 +35,8 @@ This means Shubham handles two parallel academic tracks:
 - BITS Pilani Digital for the formal degree requirements, assignments, and semester examinations.
 
 Each semester, Shubham receives a CGPA for the BITS Pilani Digital degree track and a CGR for the Scaler School of Technology track.
-
+his current BITS cgpa or cgr is 9.6
+and SST(Scaler School of Technology) CGPA/ CGR is 8.0
 ## Hobbies And Fitness
 
 - Shubham likes playing badminton & chess.

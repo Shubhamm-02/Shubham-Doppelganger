@@ -2,6 +2,7 @@ import { buildProfileChunks, type DocumentChunk } from "@/lib/chunking";
 import {
   embedTexts,
   generateGroundedAnswer,
+  generateGroundedVoiceAnswer,
   hasOpenAIConfig,
   isModelRefusal
 } from "@/lib/openai-client";
@@ -17,7 +18,7 @@ export type ProfileAnswer = {
 };
 
 const REFUSAL =
-  "I do not have that information in the local resume or project notes yet.";
+  "I do not have that detail in Shubham's verified profile yet.";
 
 const STOP_WORDS = new Set([
   "a",
@@ -30,6 +31,7 @@ const STOP_WORDS = new Set([
   "by",
   "for",
   "from",
+  "his",
   "how",
   "i",
   "in",
@@ -53,6 +55,16 @@ const STOP_WORDS = new Set([
   "your"
 ]);
 
+const QUERY_SYNONYMS: Record<string, string[]> = {
+  age: ["born", "birth", "birthday", "old", "years"],
+  born: ["birth", "birthday", "age", "old", "years"],
+  birthday: ["born", "birth", "age"],
+  degree: ["bits", "pilani", "bsc", "computer", "science"],
+  college: ["scaler", "school", "technology", "bits", "pilani"],
+  hobbies: ["badminton", "gym", "fitness", "chess"],
+  hobby: ["badminton", "gym", "fitness", "chess"]
+};
+
 const KNOWN_PROJECT_NAMES = [
   "PDF-Grounded Chatbot",
   "CommentAI",
@@ -66,6 +78,16 @@ function tokenize(value: string) {
     .replace(/[^a-z0-9+#.]+/g, " ")
     .split(/\s+/)
     .filter((token) => token.length > 2 && !STOP_WORDS.has(token));
+}
+
+function expandQueryTokens(tokens: string[]) {
+  const expanded = new Set(tokens);
+  for (const token of tokens) {
+    for (const synonym of QUERY_SYNONYMS[token] ?? []) {
+      expanded.add(synonym);
+    }
+  }
+  return Array.from(expanded);
 }
 
 function excerpt(content: string) {
@@ -148,7 +170,7 @@ function formatProjectAnswer(matches: Array<{ chunk: DocumentChunk; score: numbe
 }
 
 function searchLocalChunks(question: string, limit = 4) {
-  const queryTokens = tokenize(question);
+  const queryTokens = expandQueryTokens(tokenize(question));
   if (!queryTokens.length) return [];
   const wantsProjects = isProjectQuestion(question);
 
@@ -212,9 +234,9 @@ function localKeywordAnswer(question: string): ProfileAnswer {
     if (sourceMatches.length) {
       return {
         answer:
-          "I found broad matches in Shubham's profile sources:\n\n" +
+          "I found relevant verified profile details:\n\n" +
           sourceMatches
-            .map((match, index) => `${index + 1}. ${match.title}: ${match.excerpt}`)
+            .map((match, index) => `${index + 1}. ${match.excerpt}`)
             .join("\n\n"),
         citations: sourceMatches.map((match) => match.relativePath),
         grounded: true,
@@ -250,13 +272,13 @@ function localKeywordAnswer(question: string): ProfileAnswer {
   const sourceSummary = chunkMatches
     .map((match, index) => {
       const chunk = match.chunk as DocumentChunk;
-      return `${index + 1}. ${chunk.sourceName} / ${chunk.metadata.sectionTitle}:\n${excerpt(chunk.content)}`;
+      return `${index + 1}. ${chunk.metadata.sectionTitle}:\n${excerpt(chunk.content)}`;
     })
     .join("\n\n");
 
   return {
     answer:
-      "Based on Shubham's resume and project notes, these are the most relevant matches:\n\n" +
+      "Based on Shubham's verified profile, these are the most relevant details:\n\n" +
       sourceSummary,
     citations: Array.from(
       new Set(chunkMatches.map((match) => match.chunk.sourcePath))
@@ -272,7 +294,25 @@ function isBoilerplateSection(sectionTitle: unknown) {
   );
 }
 
-export function answerVoiceProfileQuestion(question: string): ProfileAnswer {
+function toRetrievedDocuments(
+  matches: Array<{ chunk: DocumentChunk; score: number }>
+) {
+  return matches.map(({ chunk, score }, index) => ({
+    id: index + 1,
+    source_type: chunk.sourceType,
+    source_name: chunk.sourceName,
+    source_path: chunk.sourcePath,
+    source_url: chunk.sourceUrl,
+    chunk_index: chunk.chunkIndex,
+    content: chunk.content,
+    metadata: chunk.metadata,
+    similarity: Math.min(0.99, Math.max(0.01, score / 10))
+  }));
+}
+
+export async function answerVoiceProfileQuestion(
+  question: string
+): Promise<ProfileAnswer> {
   const chunkMatches = searchLocalChunks(question, 5);
 
   if (!chunkMatches.length) {
@@ -301,17 +341,32 @@ export function answerVoiceProfileQuestion(question: string): ProfileAnswer {
     };
   }
 
+  if (hasOpenAIConfig()) {
+    try {
+      const documents = toRetrievedDocuments(documentMatches);
+      const answer = await generateGroundedVoiceAnswer(question, documents);
+      return {
+        answer,
+        citations: Array.from(new Set(documentMatches.map((match) => match.chunk.sourcePath))),
+        grounded: !isModelRefusal(answer),
+        retrievalMode: "local-keyword"
+      };
+    } catch (error) {
+      console.warn("OpenAI voice synthesis failed. Returning grounded facts.", error);
+    }
+  }
+
   const facts = documentMatches
     .slice(0, 4)
     .map(({ chunk }) => {
       const section = String(chunk.metadata.sectionTitle ?? "Profile");
       const summary = cleanMarkdown(excerpt(chunk.content)).slice(0, 260).trim();
-      return `- ${chunk.sourceName} / ${section}: ${summary}`;
+      return `- ${section}: ${summary}`;
     })
     .join("\n");
 
   return {
-    answer: `Use these grounded profile facts to answer briefly:\n${facts}`,
+    answer: `Use these verified profile facts to answer briefly. Do not mention file names, folders, citations, or source labels.\n${facts}`,
     citations: Array.from(new Set(documentMatches.map((match) => match.chunk.sourcePath))),
     grounded: true,
     retrievalMode: "local-keyword"
@@ -354,7 +409,7 @@ export async function answerProfileQuestion(
 
     if (!documents.length) {
       const answer =
-        "I do not have that information in the indexed resume or project notes.";
+        "I do not have that detail in Shubham's verified profile yet.";
       await tryLogConversation({
         channel: "chat",
         sessionId: options.sessionId,
