@@ -72,6 +72,15 @@ const KNOWN_PROJECT_NAMES = [
   "CLI Agent"
 ];
 
+const SHUBHAM_NAME_MISHEARS =
+  /\b(?:shivam|shivaam|shibham|shubim|shubimshah|shubim shah|shubhamshah|shoobham|schubham)(?:'s)?\b/gi;
+
+function normalizeProfileQuestion(question: string) {
+  return question.replace(SHUBHAM_NAME_MISHEARS, (match) =>
+    match.toLowerCase().endsWith("'s") ? "Shubham's" : "Shubham"
+  );
+}
+
 function tokenize(value: string) {
   return value
     .toLowerCase()
@@ -107,6 +116,9 @@ function firstMeaningfulLine(content: string) {
       (line) =>
         line &&
         !line.startsWith("#") &&
+        !line.startsWith("Source:") &&
+        !line.startsWith("Source path:") &&
+        !line.startsWith("Section:") &&
         !line.startsWith("- Project name:") &&
         !line.startsWith("- GitHub:") &&
         !line.startsWith("- Deployed app:") &&
@@ -138,13 +150,31 @@ function findOneLineSummary(chunk: DocumentChunk) {
   return firstLine ? cleanMarkdown(firstLine.replace(/^-\s*/, "")) : "";
 }
 
+function isProjectNoteChunk(chunk: DocumentChunk) {
+  return chunk.sourcePath.startsWith("data/project-notes/");
+}
+
+function projectChunkRank(chunk: DocumentChunk) {
+  const section = String(chunk.metadata.sectionTitle ?? "");
+  let rank = 0;
+  if (/one-line summary/i.test(chunk.content)) rank += 8;
+  if (/^(one-line summary|why this project matters|purpose|what it does|features)$/i.test(section)) {
+    rank += 4;
+  }
+  if (/^(source|setup|run|test|questions this note can answer|extra details to add later)$/i.test(section)) {
+    rank -= 3;
+  }
+  return rank;
+}
+
 function formatProjectAnswer(matches: Array<{ chunk: DocumentChunk; score: number }>) {
   const byProject = new Map<string, DocumentChunk>();
 
   for (const match of matches) {
     const chunk = match.chunk;
-    if (chunk.sourceType !== "project-note") continue;
-    if (!byProject.has(chunk.sourceName)) {
+    if (chunk.sourceType !== "project-note" || !isProjectNoteChunk(chunk)) continue;
+    const existing = byProject.get(chunk.sourceName);
+    if (!existing || projectChunkRank(chunk) > projectChunkRank(existing)) {
       byProject.set(chunk.sourceName, chunk);
     }
   }
@@ -170,9 +200,10 @@ function formatProjectAnswer(matches: Array<{ chunk: DocumentChunk; score: numbe
 }
 
 function searchLocalChunks(question: string, limit = 4) {
-  const queryTokens = expandQueryTokens(tokenize(question));
+  const normalizedQuestion = normalizeProfileQuestion(question);
+  const queryTokens = expandQueryTokens(tokenize(normalizedQuestion));
   if (!queryTokens.length) return [];
-  const wantsProjects = isProjectQuestion(question);
+  const wantsProjects = isProjectQuestion(normalizedQuestion);
 
   return buildProfileChunks()
     .map((chunk) => {
@@ -227,10 +258,14 @@ function searchLocalChunks(question: string, limit = 4) {
 }
 
 function localKeywordAnswer(question: string): ProfileAnswer {
-  const chunkMatches = searchLocalChunks(question);
+  const normalizedQuestion = normalizeProfileQuestion(question);
+  const chunkMatches = searchLocalChunks(
+    normalizedQuestion,
+    isProjectQuestion(normalizedQuestion) ? 300 : 4
+  );
 
   if (!chunkMatches.length) {
-    const sourceMatches = searchProfileSources(question);
+    const sourceMatches = searchProfileSources(normalizedQuestion);
     if (sourceMatches.length) {
       return {
         answer:
@@ -256,7 +291,7 @@ function localKeywordAnswer(question: string): ProfileAnswer {
     chunk: match.chunk as DocumentChunk,
     score: match.score
   }));
-  const projectAnswer = isProjectQuestion(question)
+  const projectAnswer = isProjectQuestion(normalizedQuestion)
     ? formatProjectAnswer(documentMatches)
     : null;
 
@@ -313,7 +348,11 @@ function toRetrievedDocuments(
 export async function answerVoiceProfileQuestion(
   question: string
 ): Promise<ProfileAnswer> {
-  const chunkMatches = searchLocalChunks(question, 5);
+  const normalizedQuestion = normalizeProfileQuestion(question);
+  const chunkMatches = searchLocalChunks(
+    normalizedQuestion,
+    isProjectQuestion(normalizedQuestion) ? 300 : 5
+  );
 
   if (!chunkMatches.length) {
     return {
@@ -328,7 +367,7 @@ export async function answerVoiceProfileQuestion(
     chunk: match.chunk as DocumentChunk,
     score: match.score
   }));
-  const projectAnswer = isProjectQuestion(question)
+  const projectAnswer = isProjectQuestion(normalizedQuestion)
     ? formatProjectAnswer(documentMatches)
     : null;
 
@@ -344,7 +383,7 @@ export async function answerVoiceProfileQuestion(
   if (hasOpenAIConfig()) {
     try {
       const documents = toRetrievedDocuments(documentMatches);
-      const answer = await generateGroundedVoiceAnswer(question, documents);
+      const answer = await generateGroundedVoiceAnswer(normalizedQuestion, documents);
       return {
         answer,
         citations: Array.from(new Set(documentMatches.map((match) => match.chunk.sourcePath))),
@@ -378,9 +417,10 @@ export async function answerProfileQuestion(
   options: { sessionId?: number } = {}
 ): Promise<ProfileAnswer> {
   const startedAt = Date.now();
+  const normalizedQuestion = normalizeProfileQuestion(question);
 
   if (!hasOpenAIConfig() || !hasSupabaseConfig()) {
-    const fallback = localKeywordAnswer(question);
+    const fallback = localKeywordAnswer(normalizedQuestion);
     await tryLogConversation({
       channel: "chat",
       sessionId: options.sessionId,
@@ -394,7 +434,7 @@ export async function answerProfileQuestion(
   }
 
   try {
-    const [queryEmbedding] = await embedTexts([question]);
+    const [queryEmbedding] = await embedTexts([normalizedQuestion]);
     const rawDocuments = await matchDocuments(queryEmbedding, {
       matchCount: 14,
       threshold: 0.12
@@ -428,7 +468,7 @@ export async function answerProfileQuestion(
       };
     }
 
-    const answer = await generateGroundedAnswer(question, documents);
+    const answer = await generateGroundedAnswer(normalizedQuestion, documents);
     const grounded = !isModelRefusal(answer);
     const citations = grounded
       ? Array.from(new Set(documents.map((document) => document.source_path)))
@@ -452,6 +492,6 @@ export async function answerProfileQuestion(
     };
   } catch (error) {
     console.warn("Supabase vector RAG failed. Falling back locally.", error);
-    return localKeywordAnswer(question);
+    return localKeywordAnswer(normalizedQuestion);
   }
 }

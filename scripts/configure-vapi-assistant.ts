@@ -8,8 +8,10 @@ Core behavior:
 - Keep responses short, spoken, and natural. Prefer 1-2 sentences.
 - For voice, optimize for speed: answer directly, avoid long setup, and do not read long lists unless asked.
 - Do not invent facts about Shubham.
+- The caller is usually asking about Shubham even if speech-to-text hears "Shivam", "Shubim", "Shubhamshah", or a similar variant. Treat those as Shubham Shah silently. Never say you do not know "Shivam"; search Shubham's profile instead.
 - For any question about Shubham's resume, projects, skills, education, links, internships, or experience, call search_profile first. Base your answer only on the tool result.
 - If the tool result says the information is unavailable, say you do not have that detail in Shubham's verified profile yet.
+- If the caller says "stop", "pause", "wait", "hold on", "wait a minute", or "one second", stop your current response immediately and ask briefly, "Okay, what would you like to do?"
 
 Scheduling behavior:
 - If the user wants to schedule, interview, book, meet, call, or asks about availability, enter scheduling mode.
@@ -21,6 +23,7 @@ Scheduling behavior:
 - First ask only for the preferred day/date. Say: "Which day should I check? For example, tomorrow or May eleven."
 - After the caller gives a day/date, call get_availability. It returns up to three available 15-minute slots.
 - For get_availability, read spokenMessage exactly once. Do not rewrite the slots, add "India time", or repeat the options in a second message.
+- When reading slot options, say the date once at most. Do not repeat "May eleven" or the weekday inside every option; say only the option number and time.
 - After the caller chooses a slot, collect any missing booking details: name, email, and email confirmation.
 - The email must be the interviewer's email address, not Shubham's own email address.
 - After the caller gives an email address, read it back and ask them to confirm it is correct before booking. If they spell the email after your readback, update the email and ask for one final confirmation.
@@ -137,7 +140,7 @@ function buildTools(url: string) {
     functionTool(
       url,
       "search_profile",
-      "Search Shubham Shah's verified profile. Use for all questions about projects, skills, experience, internships, education, links, personal background, age, hobbies, or college background.",
+      "Search Shubham Shah's verified profile. Use for all questions about projects, skills, experience, internships, education, links, personal background, age, hobbies, or college background. Treat speech-to-text variants like Shivam, Shubim, Shubhamshah, or similar names as Shubham Shah.",
       {
         question: {
           type: "string",
@@ -254,7 +257,7 @@ async function main() {
 
   const patch = {
     firstMessage:
-      "Hi, I am Wizard, Shubham Shah's AI representative. I can answer questions about his work or help schedule an interview.",
+      "Hi, I am Wizard, the AI representative for Shubham Shah. I can answer questions about his work or help schedule an interview.",
     firstMessageMode: "assistant-speaks-first",
     backgroundSound: "off",
     startSpeakingPlan: {
@@ -265,8 +268,8 @@ async function main() {
       }
     },
     stopSpeakingPlan: {
-      numWords: 10,
-      backoffSeconds: 0.8,
+      numWords: 1,
+      backoffSeconds: 0.2,
       acknowledgementPhrases: [
         "okay",
         "ok",
