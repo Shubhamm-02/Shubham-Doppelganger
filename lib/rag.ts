@@ -53,6 +53,13 @@ const STOP_WORDS = new Set([
   "your"
 ]);
 
+const KNOWN_PROJECT_NAMES = [
+  "PDF-Grounded Chatbot",
+  "CommentAI",
+  "CCPA Compliance Reasoning System",
+  "CLI Agent"
+];
+
 function tokenize(value: string) {
   return value
     .toLowerCase()
@@ -70,9 +77,80 @@ function excerpt(content: string) {
   return cleaned.length > 850 ? `${cleaned.slice(0, 850).trim()}...` : cleaned;
 }
 
+function firstMeaningfulLine(content: string) {
+  return content
+    .split("\n")
+    .map((line) => line.trim())
+    .find(
+      (line) =>
+        line &&
+        !line.startsWith("#") &&
+        !line.startsWith("- Project name:") &&
+        !line.startsWith("- GitHub:") &&
+        !line.startsWith("- Deployed app:") &&
+        !line.startsWith("- Source:")
+    );
+}
+
+function isProjectQuestion(question: string) {
+  return /\b(project|projects|built|github|portfolio|repo|repos)\b/i.test(question);
+}
+
+function cleanMarkdown(value: string) {
+  return value
+    .replace(/\*\*/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .trim();
+}
+
+function findOneLineSummary(chunk: DocumentChunk) {
+  const lines = chunk.content.split("\n").map((line) => line.trim());
+  const oneLineIndex = lines.findIndex((line) => /^## One-Line Summary/i.test(line));
+  if (oneLineIndex >= 0) {
+    const next = lines.slice(oneLineIndex + 1).find((line) => line && !line.startsWith("#"));
+    if (next) return cleanMarkdown(next);
+  }
+
+  const firstLine = firstMeaningfulLine(chunk.content);
+  return firstLine ? cleanMarkdown(firstLine.replace(/^-\s*/, "")) : "";
+}
+
+function formatProjectAnswer(matches: Array<{ chunk: DocumentChunk; score: number }>) {
+  const byProject = new Map<string, DocumentChunk>();
+
+  for (const match of matches) {
+    const chunk = match.chunk;
+    if (chunk.sourceType !== "project-note") continue;
+    if (!byProject.has(chunk.sourceName)) {
+      byProject.set(chunk.sourceName, chunk);
+    }
+  }
+
+  const chunks = Array.from(byProject.values());
+  if (!chunks.length) return null;
+
+  const bullets = chunks
+    .slice(0, 5)
+    .map((chunk) => {
+      const summary = findOneLineSummary(chunk);
+      return `- ${chunk.sourceName}${summary ? `: ${summary}` : ""}`;
+    })
+    .join("\n");
+
+  return [
+    "Shubham's strongest project examples include:",
+    "",
+    bullets,
+    "",
+    "These are relevant because they show practical work with RAG, agents, local LLMs, retrieval, guardrails, and deployed AI tools."
+  ].join("\n");
+}
+
 function searchLocalChunks(question: string, limit = 4) {
   const queryTokens = tokenize(question);
   if (!queryTokens.length) return [];
+  const wantsProjects = isProjectQuestion(question);
 
   return buildProfileChunks()
     .map((chunk) => {
@@ -93,7 +171,21 @@ function searchLocalChunks(question: string, limit = 4) {
       )
         ? 4
         : 0;
-      const projectNoteBias = chunk.sourceType === "project-note" ? 0.5 : 0;
+      const projectNoteBias =
+        chunk.sourceType === "project-note" ? (wantsProjects ? 4 : 0.5) : 0;
+      const resumeProjectPenalty =
+        wantsProjects &&
+        chunk.sourceType === "resume" &&
+        /^(shubham shah|projects)$/i.test(String(chunk.metadata.sectionTitle))
+          ? 2
+          : 0;
+      const knownProjectBoost =
+        wantsProjects &&
+        KNOWN_PROJECT_NAMES.some((projectName) =>
+          chunk.sourceName.toLowerCase().includes(projectName.toLowerCase())
+        )
+          ? 1.5
+          : 0;
 
       return {
         chunk,
@@ -102,7 +194,9 @@ function searchLocalChunks(question: string, limit = 4) {
           titleBoost +
           sectionBoost +
           projectNoteBias -
-          boilerplatePenalty
+          boilerplatePenalty -
+          resumeProjectPenalty +
+          knownProjectBoost
       };
     })
     .filter((match) => match.score > 0)
@@ -132,6 +226,23 @@ function localKeywordAnswer(question: string): ProfileAnswer {
       answer: REFUSAL,
       citations: [],
       grounded: false,
+      retrievalMode: "local-keyword"
+    };
+  }
+
+  const documentMatches = chunkMatches.map((match) => ({
+    chunk: match.chunk as DocumentChunk,
+    score: match.score
+  }));
+  const projectAnswer = isProjectQuestion(question)
+    ? formatProjectAnswer(documentMatches)
+    : null;
+
+  if (projectAnswer) {
+    return {
+      answer: projectAnswer,
+      citations: Array.from(new Set(documentMatches.map((match) => match.chunk.sourcePath))),
+      grounded: true,
       retrievalMode: "local-keyword"
     };
   }

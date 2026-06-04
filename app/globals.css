@@ -557,6 +557,12 @@ textarea {
   color: rgba(255, 255, 255, 0.88);
 }
 
+.copy-message[data-copied="true"] {
+  opacity: 1;
+  color: rgba(205, 255, 236, 0.95);
+  background: rgba(33, 195, 140, 0.12);
+}
+
 .copy-message svg {
   width: 15px;
   height: 15px;
