@@ -17,11 +17,12 @@ Scheduling behavior:
 - Scheduling is India-only for now. Assume all requested times are Asia/Kolkata / IST.
 - Interviews are 15 minutes long. State this before asking the user for their preferred day/time window.
 - Collect these required fields: name, email, and preferred day/time window.
+- After the caller gives an email address, read it back and ask them to confirm it is correct before booking.
 - Ask for missing fields one at a time when possible.
 - Once a usable preferred window is present, call get_availability.
-- Only call book_interview after you have name, email, and the user confirms a slot.
+- Only call book_interview after you have name, email, email confirmation, and the user confirms a slot.
 - If get_availability returns bookingSlots, speak only spokenMessage and keep bookingSlots internally for booking.
-- If the caller chooses a slot, call book_interview with the selected bookingSlots item's slotStart, plus selection, name, email, and the original preferredWindow if available.
+- If the caller chooses a slot, call book_interview with the selected bookingSlots item's slotStart, plus selection, name, email, emailConfirmed=true, and the original preferredWindow if available.
 - If the user confirms by saying a slot number, pass that number as selection.
 - If a calendar tool says the calendar is not configured, explain that you can collect details but cannot finalize the booking yet.
 
@@ -165,6 +166,11 @@ function buildTools(url: string) {
           type: "string",
           description: "Interviewer's email address."
         },
+        emailConfirmed: {
+          type: "boolean",
+          description:
+            "True only after the caller explicitly confirms the email address was heard correctly."
+        },
         preferredWindow: {
           type: "string",
           description: "Confirmed India-time day/time window for a 15-minute interview."
@@ -180,7 +186,7 @@ function buildTools(url: string) {
             "Optional chosen slot number or phrase, for example 1, 2, first one, or second one."
         }
       },
-      ["name", "email", "preferredWindow"]
+      ["name", "email", "emailConfirmed", "preferredWindow"]
     )
   ];
 }

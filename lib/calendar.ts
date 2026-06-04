@@ -19,6 +19,7 @@ type CalendarResult = {
 type ParsedCalendarInput = {
   name?: string;
   email?: string;
+  emailConfirmed: boolean;
   preferredWindow?: string;
   slotStart?: string;
   text: string;
@@ -98,6 +99,13 @@ function stringValue(input: Record<string, unknown>, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function booleanValue(input: Record<string, unknown>, key: string) {
+  const value = input[key];
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") return /^(true|yes|confirmed)$/i.test(value.trim());
+  return false;
+}
+
 function parseCalendarInput(input: Record<string, unknown>): ParsedCalendarInput {
   const preferredWindow =
     stringValue(input, "preferredWindow") ||
@@ -117,6 +125,9 @@ function parseCalendarInput(input: Record<string, unknown>): ParsedCalendarInput
   return {
     name: stringValue(input, "name") || extractName(text),
     email: stringValue(input, "email") || text.match(EMAIL_PATTERN)?.[0],
+    emailConfirmed:
+      booleanValue(input, "emailConfirmed") ||
+      booleanValue(input, "confirmedEmail"),
     preferredWindow,
     slotStart: stringValue(input, "slotStart") || stringValue(input, "start"),
     text
@@ -472,6 +483,9 @@ function missingBookingFields(parsed: ParsedCalendarInput) {
   const missing: string[] = [];
   if (!parsed.name) missing.push("name");
   if (!parsed.email) missing.push("email");
+  if (parsed.email && !parsed.emailConfirmed) {
+    missing.push(`confirmation that ${parsed.email} is the correct email`);
+  }
   if (parsed.slotStart && !Number.isNaN(Date.parse(parsed.slotStart))) {
     return missing;
   }
