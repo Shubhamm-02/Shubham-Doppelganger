@@ -161,10 +161,10 @@ export function ChatShell() {
         setSchedulingMode(
           Boolean(
             latestAssistant &&
-              /i can book an interview|i can help schedule|i still need|propose available slots|book it end-to-end/i.test(
+              /i can book an interview|i can help schedule|i still need|available interview slots|reply with the slot|book it end-to-end|could not find an open slot/i.test(
                 latestAssistant
               ) &&
-              !/details i need|calendar booking flow/i.test(latestAssistant)
+              !/booked|confirmed for|calendar invite/i.test(latestAssistant)
           )
         );
       })

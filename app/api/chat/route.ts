@@ -19,11 +19,11 @@ function hasActiveSchedulingFlow(
   const latestAssistant = turns.find((turn) => turn.assistant_message)
     ?.assistant_message;
   if (!latestAssistant) return false;
-  if (/details i need|use the calendar booking flow/i.test(latestAssistant)) {
+  if (/booked|confirmed for|calendar invite/i.test(latestAssistant)) {
     return false;
   }
 
-  return /i can book an interview|i can help schedule|i still need|propose available slots|book it end-to-end/i.test(
+  return /i can book an interview|i can help schedule|i still need|available interview slots|reply with the slot|book it end-to-end|could not find an open slot/i.test(
     latestAssistant
   );
 }
@@ -40,7 +40,7 @@ function schedulingContextText(
 }
 
 function isSchedulingComplete(answer: string) {
-  return /details i need|calendar booking flow/i.test(answer);
+  return /booked|confirmed for|calendar invite/i.test(answer);
 }
 
 export async function POST(request: Request) {
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
           ? `${parsed.data.schedulingContext}\n${message}`
           : schedulingContextText(recentTurns, message)
         : message;
-    const payload = calendarIntentResponse(intent, responseInput);
+    const payload = await calendarIntentResponse(intent, responseInput, message);
     await tryLogConversation({
       channel: "chat",
       sessionId,

@@ -13,7 +13,7 @@ export type ProfileAnswer = {
   answer: string;
   citations: string[];
   grounded: boolean;
-  retrievalMode: "supabase-vector" | "local-keyword";
+  retrievalMode: "supabase-vector" | "local-keyword" | "calendar";
 };
 
 const REFUSAL =

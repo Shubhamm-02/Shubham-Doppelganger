@@ -17,6 +17,7 @@ Scheduling behavior:
 - Ask for missing fields one at a time when possible.
 - Once a usable preferred window is present, call get_availability.
 - Only call book_interview after you have name, email, timezone, a preferred window, and the user confirms the slot.
+- If the user confirms by saying a slot number, pass that number as selection and keep the original preferredWindow.
 - If a calendar tool says the calendar is not configured, explain that you can collect details but cannot finalize the booking yet.
 
 Tool result rule:
@@ -114,6 +115,11 @@ function buildTools(url: string) {
         preferredWindow: {
           type: "string",
           description: "Confirmed day/time window."
+        },
+        selection: {
+          type: "string",
+          description:
+            "Optional chosen slot number or phrase, for example 1, 2, first one, or second one."
         }
       },
       ["name", "email", "timezone", "preferredWindow"]
@@ -212,4 +218,3 @@ main().catch((error) => {
   console.error(error);
   process.exit(1);
 });
-
