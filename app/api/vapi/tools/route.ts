@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { bookInterview, getAvailability } from "@/lib/calendar";
-import { answerProfileQuestion } from "@/lib/rag";
+import { answerVoiceProfileQuestion } from "@/lib/rag";
 
 export const runtime = "nodejs";
 
@@ -71,19 +71,34 @@ function singleLine(value: unknown) {
   return text.replace(/\s+/g, " ").trim();
 }
 
+function calendarToolResult(result: {
+  message: string;
+  slots?: Array<{ start: string; label: string }>;
+}) {
+  return {
+    spokenMessage: result.message,
+    bookingSlots:
+      result.slots?.map((slot, index) => ({
+        selection: String(index + 1),
+        label: slot.label,
+        slotStart: slot.start
+      })) ?? []
+  };
+}
+
 async function runTool(toolCall: ToolCall) {
   const args = toolCall.arguments ?? {};
 
   if (toolCall.name === "search_profile") {
     const question =
       typeof args.question === "string" ? args.question : "Summarize profile.";
-    const result = await answerProfileQuestion(question);
+    const result = answerVoiceProfileQuestion(question);
     return result.answer;
   }
 
   if (toolCall.name === "get_availability") {
     const result = await getAvailability(args);
-    return result.message;
+    return calendarToolResult(result);
   }
 
   if (toolCall.name === "book_interview") {

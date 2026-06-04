@@ -272,6 +272,52 @@ function isBoilerplateSection(sectionTitle: unknown) {
   );
 }
 
+export function answerVoiceProfileQuestion(question: string): ProfileAnswer {
+  const chunkMatches = searchLocalChunks(question, 5);
+
+  if (!chunkMatches.length) {
+    return {
+      answer: REFUSAL,
+      citations: [],
+      grounded: false,
+      retrievalMode: "local-keyword"
+    };
+  }
+
+  const documentMatches = chunkMatches.map((match) => ({
+    chunk: match.chunk as DocumentChunk,
+    score: match.score
+  }));
+  const projectAnswer = isProjectQuestion(question)
+    ? formatProjectAnswer(documentMatches)
+    : null;
+
+  if (projectAnswer) {
+    return {
+      answer: projectAnswer,
+      citations: Array.from(new Set(documentMatches.map((match) => match.chunk.sourcePath))),
+      grounded: true,
+      retrievalMode: "local-keyword"
+    };
+  }
+
+  const facts = documentMatches
+    .slice(0, 4)
+    .map(({ chunk }) => {
+      const section = String(chunk.metadata.sectionTitle ?? "Profile");
+      const summary = cleanMarkdown(excerpt(chunk.content)).slice(0, 260).trim();
+      return `- ${chunk.sourceName} / ${section}: ${summary}`;
+    })
+    .join("\n");
+
+  return {
+    answer: `Use these grounded profile facts to answer briefly:\n${facts}`,
+    citations: Array.from(new Set(documentMatches.map((match) => match.chunk.sourcePath))),
+    grounded: true,
+    retrievalMode: "local-keyword"
+  };
+}
+
 export async function answerProfileQuestion(
   question: string,
   options: { sessionId?: number } = {}

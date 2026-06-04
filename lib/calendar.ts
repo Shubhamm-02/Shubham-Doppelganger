@@ -20,6 +20,7 @@ type ParsedCalendarInput = {
   name?: string;
   email?: string;
   preferredWindow?: string;
+  slotStart?: string;
   text: string;
 };
 
@@ -117,6 +118,7 @@ function parseCalendarInput(input: Record<string, unknown>): ParsedCalendarInput
     name: stringValue(input, "name") || extractName(text),
     email: stringValue(input, "email") || text.match(EMAIL_PATTERN)?.[0],
     preferredWindow,
+    slotStart: stringValue(input, "slotStart") || stringValue(input, "start"),
     text
   };
 }
@@ -470,6 +472,9 @@ function missingBookingFields(parsed: ParsedCalendarInput) {
   const missing: string[] = [];
   if (!parsed.name) missing.push("name");
   if (!parsed.email) missing.push("email");
+  if (parsed.slotStart && !Number.isNaN(Date.parse(parsed.slotStart))) {
+    return missing;
+  }
   if (
     !parsed.preferredWindow &&
     !extractTargetDateKey(parsed.text, DEFAULT_TIMEZONE)
@@ -543,10 +548,20 @@ export async function bookInterview(
   }
 
   try {
-    const { displaySlots, timezone } = await fetchSlots(parsed);
-    const slot = displaySlots[extractSlotSelection(input)] || displaySlots[0];
+    const timezone = DEFAULT_TIMEZONE;
+    let selectedSlot: CalendarSlot | undefined;
 
-    if (!slot) {
+    if (parsed.slotStart && !Number.isNaN(Date.parse(parsed.slotStart))) {
+      selectedSlot = {
+        start: new Date(parsed.slotStart).toISOString(),
+        label: formatSlotLabel(parsed.slotStart, timezone)
+      };
+    } else {
+      const { displaySlots } = await fetchSlots(parsed);
+      selectedSlot = displaySlots[extractSlotSelection(input)] || displaySlots[0];
+    }
+
+    if (!selectedSlot) {
       return {
         configured: true,
         message:
@@ -557,7 +572,7 @@ export async function bookInterview(
     const response = await calFetch<CalBookingResponse>("/bookings", {
       method: "POST",
       body: JSON.stringify({
-        start: new Date(slot.start).toISOString(),
+        start: new Date(selectedSlot.start).toISOString(),
         eventTypeId,
         attendee: {
           name: parsed.name,
@@ -579,12 +594,12 @@ export async function bookInterview(
     return {
       configured: true,
       message: `Booked. The interview is confirmed for ${formatSlotLabel(
-        booking?.start || slot.start,
+        booking?.start || selectedSlot.start,
         timezone
       )}. A calendar invite should be sent to ${parsed.email}.${meetingLine}`,
       booking: {
         uid: booking?.uid,
-        start: booking?.start,
+        start: booking?.start ?? selectedSlot.start,
         end: booking?.end,
         meetingUrl
       }
