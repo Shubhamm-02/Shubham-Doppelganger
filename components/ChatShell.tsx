@@ -3,6 +3,11 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type Vapi from "@vapi-ai/web";
 
+const SCALER_FAVICON_URL =
+  "https://assets-v2.scaler.com/assets/scaler/favicon-b8be73bbdaf99603448b08956392cad1e0f2d4e0c84661b1cfc20225e9fb6a40.ico.gz";
+const ASSISTANT_INFO =
+  "Wizard answers from Shubham's resume and project notes, talks through projects and skills, and can schedule 15-minute interviews in Indian Standard Time.";
+
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
@@ -28,14 +33,7 @@ type SessionRow = {
   created_at: string;
 };
 
-const initialMessages: ChatMessage[] = [
-  {
-    id: "welcome",
-    role: "assistant",
-    content:
-      "Hi, I am Shubham Shah's AI representative. Chat is now RAG-grounded over the resume and project notes. Ask about projects, skills, or say you want to book an interview."
-  }
-];
+const initialMessages: ChatMessage[] = [];
 
 function formatCitationLabel(path: string) {
   if (path.endsWith("data/resume.md")) return "Resume";
@@ -60,14 +58,21 @@ const quickPrompts = [
 function IconButton({
   label,
   onClick,
-  children
+  children,
+  className = ""
 }: {
   label: string;
   onClick?: () => void;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <button className="rail-btn" type="button" aria-label={label} onClick={onClick}>
+    <button
+      className={`rail-btn ${className}`.trim()}
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+    >
       {children}
     </button>
   );
@@ -87,6 +92,7 @@ export function ChatShell() {
   const [schedulingMode, setSchedulingMode] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const vapiRef = useRef<Vapi | null>(null);
+  const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const vapiPublicKey = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
   const vapiAssistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
@@ -133,7 +139,7 @@ export function ChatShell() {
           ? payload.conversations
           : [];
 
-        const reconstructed: ChatMessage[] = [initialMessages[0]];
+        const reconstructed: ChatMessage[] = [...initialMessages];
         rows
           .slice()
           .reverse()
@@ -178,6 +184,17 @@ export function ChatShell() {
       vapiRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const textarea = composerTextareaRef.current;
+    if (!textarea) return;
+
+    const maxHeight = 150;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+    textarea.style.overflowY =
+      textarea.scrollHeight > maxHeight ? "auto" : "hidden";
+  }, [draft]);
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -351,64 +368,66 @@ export function ChatShell() {
           <div className="rail-header">
             <IconButton
               label={isRailCollapsed ? "Open sidebar" : "Collapse sidebar"}
+              className="rail-toggle"
               onClick={() => setIsRailCollapsed((current) => !current)}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M5.75 3h12.5A2.75 2.75 0 0 1 21 5.75v12.5A2.75 2.75 0 0 1 18.25 21H5.75A2.75 2.75 0 0 1 3 18.25V5.75A2.75 2.75 0 0 1 5.75 3ZM8 5v14h10.25c.41 0 .75-.34.75-.75V5.75a.75.75 0 0 0-.75-.75H8Zm-2.25 0a.75.75 0 0 0-.75.75v12.5c0 .41.34.75.75.75H6V5h-.25Z" />
               </svg>
             </IconButton>
-            {!isRailCollapsed ? (
-              <div className="rail-brand">
-                <span>Shubham AI</span>
-              </div>
-            ) : null}
+            <div className="rail-brand" aria-hidden={isRailCollapsed ? "true" : "false"}>
+              <span>Wizard</span>
+            </div>
           </div>
 
-          <IconButton label="New chat" onClick={resetChat}>
+          <button className="rail-new-chat" type="button" onClick={resetChat}>
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 4a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5a1 1 0 0 1 1-1Z" />
             </svg>
-          </IconButton>
+            <span>New chat</span>
+          </button>
 
-          <div className="rail-divider" />
-
-          {!isRailCollapsed ? (
-            <div className="rail-recent" aria-label="Recent chats">
-              <div className="rail-recent-title">Chats</div>
-              <div className="rail-recent-list">
-                {sessionSummaries.map((row) => (
-                  <div
-                    key={row.id}
-                    className="rail-recent-item"
-                    data-active={activeSessionId === row.id ? "true" : "false"}
+          <div
+            className="rail-recent"
+            aria-label="Recent chats"
+            aria-hidden={isRailCollapsed ? "true" : "false"}
+          >
+            <div className="rail-recent-title">Chats</div>
+            <div className="rail-recent-list">
+              {sessionSummaries.map((row) => (
+                <div
+                  key={row.id}
+                  className="rail-recent-item"
+                  data-active={activeSessionId === row.id ? "true" : "false"}
+                >
+                  <button
+                    type="button"
+                    className="rail-session-open"
+                    title={row.title}
+                    tabIndex={isRailCollapsed ? -1 : undefined}
+                    onClick={() => setActiveSessionId(row.id)}
                   >
-                    <button
-                      type="button"
-                      className="rail-session-open"
-                      title={row.title}
-                      onClick={() => setActiveSessionId(row.id)}
-                    >
-                      <span className="rail-recent-dot" aria-hidden="true" />
-                      <span className="rail-recent-text">{row.title}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="rail-session-delete"
-                      aria-label={`Delete ${row.title}`}
-                      onClick={() => deleteSession(row.id, row.title)}
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M9 3h6l1 2h4a1 1 0 1 1 0 2h-1.1l-.8 12.1A3.1 3.1 0 0 1 15 22H9a3.1 3.1 0 0 1-3.1-2.9L5.1 7H4a1 1 0 0 1 0-2h4l1-2Zm1.24 2h3.52l-.5-1h-2.52l-.5 1ZM7.11 7l.78 11.97A1.1 1.1 0 0 0 9 20h6c.58 0 1.06-.45 1.1-1.03L16.89 7H7.11ZM10 10a1 1 0 0 1 1 1v5a1 1 0 1 1-2 0v-5a1 1 0 0 1 1-1Zm4 0a1 1 0 0 1 1 1v5a1 1 0 1 1-2 0v-5a1 1 0 0 1 1-1Z" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-                {!sessionSummaries.length ? (
-                  <div className="rail-recent-empty">No chats yet</div>
-                ) : null}
-              </div>
+                    <span className="rail-recent-dot" aria-hidden="true" />
+                    <span className="rail-recent-text">{row.title}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="rail-session-delete"
+                    aria-label={`Delete ${row.title}`}
+                    tabIndex={isRailCollapsed ? -1 : undefined}
+                    onClick={() => deleteSession(row.id, row.title)}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M9 3h6l1 2h4a1 1 0 1 1 0 2h-1.1l-.8 12.1A3.1 3.1 0 0 1 15 22H9a3.1 3.1 0 0 1-3.1-2.9L5.1 7H4a1 1 0 0 1 0-2h4l1-2Zm1.24 2h3.52l-.5-1h-2.52l-.5 1ZM7.11 7l.78 11.97A1.1 1.1 0 0 0 9 20h6c.58 0 1.06-.45 1.1-1.03L16.89 7H7.11ZM10 10a1 1 0 0 1 1 1v5a1 1 0 1 1-2 0v-5a1 1 0 0 1 1-1Zm4 0a1 1 0 0 1 1 1v5a1 1 0 1 1-2 0v-5a1 1 0 0 1 1-1Z" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+              {!sessionSummaries.length ? (
+                <div className="rail-recent-empty">No chats yet</div>
+              ) : null}
             </div>
-          ) : null}
+          </div>
         </div>
 
         <div className="rail-footer">
@@ -423,12 +442,24 @@ export function ChatShell() {
           <div className="stage-title">
             <span className="stage-dot" aria-hidden="true" />
             <div className="stage-title-text">
-              <div className="stage-title-name">Shubham Shah</div>
-              <div className="stage-title-sub">AI representative (RAG-grounded)</div>
+              <div className="stage-title-name">Wizard</div>
+              <div className="stage-title-sub">
+                Shubham's AI representative
+              </div>
             </div>
           </div>
 
           <div className="stage-actions">
+            <button
+              type="button"
+              className="info-button"
+              aria-label={ASSISTANT_INFO}
+            >
+              i
+              <span className="info-tooltip" role="tooltip">
+                {ASSISTANT_INFO}
+              </span>
+            </button>
             <button
               type="button"
               className="voice-call-button"
@@ -452,9 +483,6 @@ export function ChatShell() {
                     : "Voice"}
               </span>
             </button>
-            <button type="button" className="stage-action" onClick={resetChat}>
-              New chat
-            </button>
           </div>
         </header>
         {voiceStatus === "error" && voiceError ? (
@@ -465,14 +493,12 @@ export function ChatShell() {
 
         {!hasUserMessages ? (
           <div className="start-screen">
-            <div className="brand">
-              <div className="brand-mark" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <path d="M12 2c5.52 0 10 3.9 10 8.7 0 2.85-1.61 5.39-4.14 6.97-.61 2.35-2.73 4.33-5.86 4.33-1.38 0-2.66-.36-3.78-1.01l-3.01.8.9-2.71C4.17 17.58 2 14.38 2 10.7 2 5.9 6.48 2 12 2Zm-2.05 8.1a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 0 0 0-2.3Zm4.1 0a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 0 0 0-2.3Z" />
-                </svg>
+              <div className="brand">
+                <div className="brand-mark" aria-hidden="true">
+                <img src={SCALER_FAVICON_URL} alt="" />
               </div>
-              <h1>Shubham Shah</h1>
-              <p>RAG-grounded interview representative</p>
+              <h1>Wizard</h1>
+              <p>Shubham's RAG-grounded interview representative</p>
             </div>
 
             <div className="prompt-row" role="group" aria-label="Quick prompts">
@@ -546,13 +572,13 @@ export function ChatShell() {
 
         <form className="composer" onSubmit={sendMessage}>
           <div className="composer-inner">
-            <div className="composer-leading" aria-hidden="true" />
-
             <textarea
+              ref={composerTextareaRef}
               aria-label="Message"
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={onComposerKeyDown}
               placeholder="Ask anything"
+              rows={1}
               value={draft}
             />
 
@@ -570,6 +596,9 @@ export function ChatShell() {
             </div>
           </div>
         </form>
+        <footer className="stage-footnote">
+          Powered by Shubham's resume, project notes, and live calendar.
+        </footer>
       </section>
     </main>
   );

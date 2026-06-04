@@ -102,7 +102,9 @@ export async function POST(request: Request) {
       latencyMs: Date.now() - startedAt
     });
     if (sessionInfo?.created && sessionId && payload.answer) {
-      await autoTitleSessionFromAnswer(sessionId, payload.answer).catch(() => {});
+      await autoTitleSessionFromAnswer(sessionId, payload.answer, message).catch(
+        () => {}
+      );
     }
     return NextResponse.json({
       ...payload,
@@ -114,7 +116,9 @@ export async function POST(request: Request) {
 
   const result = await answerProfileQuestion(message, { sessionId });
   if (sessionInfo?.created && sessionId && result.answer) {
-    await autoTitleSessionFromAnswer(sessionId, result.answer).catch(() => {});
+    await autoTitleSessionFromAnswer(sessionId, result.answer, message).catch(
+      () => {}
+    );
   }
   return NextResponse.json({ ...result, sessionId } satisfies unknown);
 }

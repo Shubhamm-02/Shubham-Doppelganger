@@ -62,6 +62,7 @@ textarea {
 .rail {
   position: sticky;
   top: 0;
+  width: var(--rail-w-open);
   height: 100vh;
   border-right: 1px solid var(--border);
   background: rgba(8, 11, 16, 0.82);
@@ -70,6 +71,10 @@ textarea {
   flex-direction: column;
   padding: 14px 10px;
   gap: 12px;
+  overflow: hidden;
+  transition: width 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    background 180ms ease, border-color 180ms ease;
+  will-change: width;
 }
 
 .rail.rail-collapsed {
@@ -97,7 +102,22 @@ textarea {
   grid-template-columns: 1fr;
 }
 
+.rail:not(.rail-collapsed) .rail-header {
+  grid-template-columns: minmax(0, 1fr) 44px;
+}
+
+.rail-toggle {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.rail:not(.rail-collapsed) .rail-toggle {
+  grid-column: 2;
+}
+
 .rail-brand {
+  grid-column: 2;
+  grid-row: 1;
   min-width: 0;
   color: rgba(255, 255, 255, 0.88);
   font-size: 14px;
@@ -106,6 +126,21 @@ textarea {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 160ms ease 70ms, transform 180ms ease 60ms;
+}
+
+.rail:not(.rail-collapsed) .rail-brand {
+  grid-column: 1;
+}
+
+.rail-collapsed .rail-brand {
+  grid-column: 1;
+  opacity: 0;
+  transform: translateX(-8px);
+  pointer-events: none;
+  transition-delay: 0ms;
 }
 
 .rail-divider {
@@ -143,6 +178,62 @@ textarea {
   transform: translateY(1px);
 }
 
+.rail-new-chat {
+  width: 100%;
+  height: 44px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.rail-new-chat svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+  opacity: 0.92;
+  flex: none;
+}
+
+.rail-new-chat span {
+  min-width: 0;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 160ms ease 70ms, transform 180ms ease 60ms;
+  pointer-events: none;
+  font-weight: 690;
+}
+
+.rail:not(.rail-collapsed) .rail-new-chat {
+  justify-content: flex-start;
+  padding: 0 14px;
+  background: rgba(255, 255, 255, 0.075);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.rail:not(.rail-collapsed) .rail-new-chat span {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.rail-new-chat:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.rail-new-chat:active {
+  transform: translateY(1px);
+}
+
 .rail-footer {
   margin-top: auto;
   display: flex;
@@ -156,6 +247,16 @@ textarea {
   padding-top: 10px;
   display: grid;
   gap: 8px;
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 180ms ease 80ms, transform 200ms ease 70ms;
+}
+
+.rail-collapsed .rail-recent {
+  opacity: 0;
+  transform: translateX(-10px);
+  pointer-events: none;
+  transition-delay: 0ms;
 }
 
 .rail-recent-title {
@@ -319,6 +420,58 @@ textarea {
   line-height: 1.1;
 }
 
+.info-button {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.72);
+  cursor: help;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  flex: none;
+  margin-right: 2px;
+}
+
+.info-button:hover,
+.info-button:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.info-tooltip {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  width: min(320px, calc(100vw - 40px));
+  transform: translateY(-2px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(18, 21, 28, 0.96);
+  color: rgba(255, 255, 255, 0.88);
+  border-radius: 12px;
+  box-shadow: var(--shadow-soft);
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+  z-index: 30;
+}
+
+.info-button:hover .info-tooltip,
+.info-button:focus-visible .info-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .stage-title-sub {
   font-size: 12px;
   color: var(--muted);
@@ -330,6 +483,7 @@ textarea {
 
 .stage-actions {
   display: flex;
+  align-items: center;
   gap: 10px;
 }
 
@@ -399,21 +553,6 @@ textarea {
   font-size: 13px;
 }
 
-.stage-action {
-  height: 34px;
-  padding: 0 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.86);
-  cursor: pointer;
-  font-weight: 650;
-}
-
-.stage-action:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
 .start-screen {
   max-width: var(--max-stage);
   width: 100%;
@@ -442,10 +581,10 @@ textarea {
   place-items: center;
 }
 
-.brand-mark svg {
-  width: 44px;
-  height: 44px;
-  fill: rgba(255, 255, 255, 0.9);
+.brand-mark img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
 }
 
 .brand h1 {
@@ -623,7 +762,7 @@ textarea {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(7, 9, 12, 0.78);
   backdrop-filter: blur(18px);
-  padding: 14px 16px 18px;
+  padding: 10px 16px 14px;
 }
 
 .composer-inner {
@@ -631,32 +770,29 @@ textarea {
   margin: 0 auto;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.055);
-  border-radius: 28px;
+  border-radius: 24px;
   box-shadow: var(--shadow-soft);
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 10px;
-  padding: 10px 10px;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 8px 8px 8px 14px;
+  align-items: end;
   overflow: clip;
-}
-
-.composer-leading {
-  width: 38px;
-  height: 38px;
 }
 
 .composer textarea {
   width: 100%;
-  min-height: 44px;
-  max-height: 160px;
-  resize: vertical;
+  min-height: 32px;
+  max-height: 150px;
+  resize: none;
   border: 0;
   outline: none;
   background: transparent;
-  padding: 10px 6px;
-  line-height: 1.45;
+  padding: 5px 0;
+  line-height: 1.42;
   color: rgba(255, 255, 255, 0.9);
+  overflow-y: hidden;
+  scrollbar-width: thin;
 }
 
 .composer textarea::placeholder {
@@ -667,13 +803,12 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  width: 46px;
-  padding-right: 2px;
+  width: 38px;
 }
 
 .composer-send {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.08);
@@ -686,8 +821,8 @@ textarea {
 }
 
 .composer-send svg {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   fill: currentColor;
 }
 
@@ -700,6 +835,15 @@ textarea {
   opacity: 0.55;
   cursor: not-allowed;
   transform: none;
+}
+
+.stage-footnote {
+  padding: 0 16px 14px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 12px;
+  line-height: 1.4;
+  background: rgba(7, 9, 12, 0.78);
 }
 
 @media (max-width: 760px) {
@@ -720,9 +864,9 @@ textarea {
   }
 
   .composer-inner {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 10px;
-    padding: 10px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px 8px 8px 12px;
   }
 
   .brand h1 {

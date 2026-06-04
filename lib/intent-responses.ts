@@ -103,7 +103,7 @@ export async function calendarIntentResponse(
 
     return {
       answer:
-        "I can help schedule an interview in India time. Tell me 2-3 windows that work for you (for example: Tue 2-5pm or Wed 11am-1pm), and I will propose slots from Shubham's real calendar.",
+        "I can help schedule a 15-minute interview in India time. Tell me 2-3 windows that work for you (for example: Tue 2-5pm or Wed 11am-1pm), and I will propose slots from Shubham's real calendar.",
       citations: [],
       grounded: true,
       retrievalMode: "local-keyword"
@@ -137,7 +137,7 @@ export async function calendarIntentResponse(
     return {
       answer:
         `Got it${known.length ? ` (${known.join(", ")})` : ""}. ` +
-        `I still need ${details.missing.join(", ")} before I can propose or book a slot.` +
+        `I still need ${details.missing.join(", ")} before I can propose or book a 15-minute slot.` +
         "\n\nExample: Shubham Shah, shubham@example.com, tomorrow 3-5pm.",
       citations: [],
       grounded: true,
@@ -147,7 +147,7 @@ export async function calendarIntentResponse(
 
   return {
     answer:
-      "I can book an interview in India time. Please share:\n\n1. Your name\n2. Your email (needed for the calendar invite)\n3. A preferred day/time window\n\nThen I will propose available slots and book it end-to-end.",
+      "I can book a 15-minute interview in India time. Please share:\n\n1. Your name\n2. Your email (needed for the calendar invite)\n3. A preferred day/time window\n\nThen I will propose available slots and book it end-to-end.",
     citations: [],
     grounded: true,
     retrievalMode: "local-keyword"
