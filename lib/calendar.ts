@@ -55,6 +55,7 @@ const DEFAULT_HOST_EMAILS = [
   "shubhammmm51@gmail.com"
 ];
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
+const EMAIL_LOCAL_PART_PATTERN = /^[A-Z0-9](?:[A-Z0-9._%+-]{0,62}[A-Z0-9])?$/i;
 const WEEKDAYS = [
   "sunday",
   "monday",
@@ -155,17 +156,40 @@ function booleanValue(input: Record<string, unknown>, key: string) {
   return false;
 }
 
+function normalizeEmailCandidate(value: string) {
+  const candidate = value
+    .trim()
+    .toLowerCase()
+    .replace(/\bat\b/g, "@")
+    .replace(/\bdot\b/g, ".")
+    .replace(/\s+/g, "");
+
+  if (!candidate) return "";
+  if (EMAIL_PATTERN.test(candidate)) return candidate;
+  if (EMAIL_LOCAL_PART_PATTERN.test(candidate)) {
+    return `${candidate}@gmail.com`;
+  }
+
+  return "";
+}
+
 function parseCalendarInput(input: Record<string, unknown>): ParsedCalendarInput {
   const preferredWindow =
     stringValue(input, "preferredWindow") ||
     stringValue(input, "window") ||
     stringValue(input, "timeWindow") ||
     stringValue(input, "message");
+  const explicitEmail =
+    normalizeEmailCandidate(stringValue(input, "email")) ||
+    normalizeEmailCandidate(stringValue(input, "emailLocalPart")) ||
+    normalizeEmailCandidate(stringValue(input, "emailUsername"));
   const text = [
     stringValue(input, "text"),
     stringValue(input, "message"),
     stringValue(input, "name"),
     stringValue(input, "email"),
+    stringValue(input, "emailLocalPart"),
+    stringValue(input, "emailUsername"),
     preferredWindow
   ]
     .filter(Boolean)
@@ -173,7 +197,7 @@ function parseCalendarInput(input: Record<string, unknown>): ParsedCalendarInput
 
   return {
     name: stringValue(input, "name") || extractName(text),
-    email: stringValue(input, "email") || extractLatestEmail(text),
+    email: explicitEmail || extractLatestEmail(text),
     emailConfirmed:
       booleanValue(input, "emailConfirmed") ||
       booleanValue(input, "confirmedEmail"),

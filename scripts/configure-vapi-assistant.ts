@@ -24,13 +24,16 @@ Scheduling behavior:
 - After the caller gives a day/date, call get_availability. It returns up to three available 15-minute slots.
 - For get_availability, read spokenMessage exactly once. Do not rewrite the slots, add "India time", or repeat the options in a second message.
 - When reading slot options, say the date once at most. Do not repeat "May eleven" or the weekday inside every option; say only the option number and time.
-- After the caller chooses a slot, collect any missing booking details: name, email, and email confirmation.
+- After the caller chooses a slot, collect any missing booking details: name, Gmail username, and email confirmation.
+- To avoid voice transcription mistakes, prefer asking for only the part before @gmail.com. Say: "What is the Gmail username before at gmail dot com?"
+- If the caller gives only the Gmail username, internally append @gmail.com and read back the full email once, for example "I heard rahul dot verma at gmail dot com. Is that correct?"
+- If the caller gives a full non-Gmail email address, use it as given and still read it back once for confirmation.
 - The email must be the interviewer's email address, not Shubham's own email address.
-- After the caller gives an email address, read it back and ask them to confirm it is correct before booking. If they spell the email after your readback, update the email and ask for one final confirmation.
+- After the caller gives an email address or Gmail username, read the final full email back and ask them to confirm it is correct before booking. If they correct the username after your readback, update the email and ask for one final confirmation.
 - Ask for missing fields one at a time when possible.
-- Only call book_interview after you have a selected slotStart from get_availability, name, email, and email confirmation.
+- Only call book_interview after you have a selected slotStart from get_availability, name, final full email or Gmail username, and email confirmation.
 - If get_availability returns bookingSlots, speak only spokenMessage and keep bookingSlots internally for booking.
-- If the caller chooses a slot, call book_interview with the selected bookingSlots item's slotStart, plus selection, name, email, emailConfirmed=true, and the original preferred day/date as preferredWindow.
+- If the caller chooses a slot, call book_interview with the selected bookingSlots item's slotStart, plus selection, name, email, emailConfirmed=true, and the original preferred day/date as preferredWindow. If the caller gave only the Gmail username, pass that username in the email field; the backend will append @gmail.com.
 - If the user says an incomplete phrase like "book the", ask which slot number they want instead of guessing.
 - If book_interview returns a rejection message, say that exact reason and stop retrying other slots unless the caller explicitly chooses a new slot or gives a new email.
 - If a calendar tool says the calendar is not configured, explain that you can collect details but cannot finalize the booking yet.
@@ -174,7 +177,8 @@ function buildTools(url: string) {
         },
         email: {
           type: "string",
-          description: "Interviewer's email address."
+          description:
+            "Interviewer's full email address, or only the Gmail username/local part before @gmail.com. If the caller says rahul dot verma, pass rahul.verma."
         },
         emailConfirmed: {
           type: "boolean",
