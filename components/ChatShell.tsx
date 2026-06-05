@@ -92,6 +92,8 @@ export function ChatShell() {
   const [schedulingMode, setSchedulingMode] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const vapiRef = useRef<Vapi | null>(null);
+  const vapiInitPromiseRef = useRef<Promise<Vapi | null> | null>(null);
+  const isMountedRef = useRef(false);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const vapiPublicKey = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
@@ -187,12 +189,36 @@ export function ChatShell() {
   }, [activeSessionId]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+
     return () => {
+      isMountedRef.current = false;
       void vapiRef.current?.stop();
       vapiRef.current?.removeAllListeners();
       vapiRef.current = null;
+      vapiInitPromiseRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!isVoiceConfigured) return;
+    const win = window as typeof window & {
+      requestIdleCallback?: (callback: () => void) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    if (win.requestIdleCallback) {
+      const id = win.requestIdleCallback(() => {
+        void prewarmVoiceClient();
+      });
+      return () => win.cancelIdleCallback?.(id);
+    }
+
+    const timeout = window.setTimeout(() => {
+      void prewarmVoiceClient();
+    }, 1200);
+    return () => window.clearTimeout(timeout);
+  }, [isVoiceConfigured, vapiPublicKey]);
 
   useEffect(() => {
     const textarea = composerTextareaRef.current;
@@ -323,6 +349,51 @@ export function ChatShell() {
     form?.requestSubmit();
   }
 
+  async function ensureVapiClient() {
+    if (!isVoiceConfigured || !vapiPublicKey) return null;
+    if (vapiRef.current) return vapiRef.current;
+    if (vapiInitPromiseRef.current) return vapiInitPromiseRef.current;
+
+    vapiInitPromiseRef.current = import("@vapi-ai/web")
+      .then(({ default: VapiClient }) => {
+        const client = new VapiClient(vapiPublicKey);
+
+        client.on("call-start", () => setVoiceStatus("connected"));
+        client.on("call-end", () => setVoiceStatus("idle"));
+        client.on("call-start-failed", (event) => {
+          setVoiceStatus("error");
+          setVoiceError(event?.error ?? "Voice call failed to start.");
+        });
+        client.on("error", (error) => {
+          setVoiceStatus("error");
+          setVoiceError(error?.message ?? "Voice call failed.");
+        });
+
+        if (!isMountedRef.current) {
+          client.removeAllListeners();
+          return null;
+        }
+
+        vapiRef.current = client;
+        return client;
+      })
+      .catch((error) => {
+        vapiInitPromiseRef.current = null;
+        throw error;
+      });
+
+    return vapiInitPromiseRef.current;
+  }
+
+  async function prewarmVoiceClient() {
+    if (!isVoiceConfigured || vapiRef.current) return;
+    try {
+      await ensureVapiClient();
+    } catch {
+      // Keep preload failures quiet; the button click will surface real errors.
+    }
+  }
+
   async function toggleVoiceCall() {
     if (!isVoiceConfigured || !vapiPublicKey || !vapiAssistantId) {
       setVoiceStatus("error");
@@ -341,26 +412,12 @@ export function ChatShell() {
     try {
       setVoiceError("");
       setVoiceStatus("connecting");
-
-      if (!vapiRef.current) {
-        const { default: VapiClient } = await import("@vapi-ai/web");
-        const client = new VapiClient(vapiPublicKey);
-
-        client.on("call-start", () => setVoiceStatus("connected"));
-        client.on("call-end", () => setVoiceStatus("idle"));
-        client.on("call-start-failed", (event) => {
-          setVoiceStatus("error");
-          setVoiceError(event?.error ?? "Voice call failed to start.");
-        });
-        client.on("error", (error) => {
-          setVoiceStatus("error");
-          setVoiceError(error?.message ?? "Voice call failed.");
-        });
-
-        vapiRef.current = client;
+      const client = await ensureVapiClient();
+      if (!client) {
+        throw new Error("Voice client could not be initialized.");
       }
 
-      await vapiRef.current.start(vapiAssistantId);
+      await client.start(vapiAssistantId);
     } catch (error) {
       setVoiceStatus("error");
       setVoiceError(error instanceof Error ? error.message : "Voice call failed.");
@@ -476,6 +533,8 @@ export function ChatShell() {
               data-status={voiceStatus}
               disabled={!isVoiceConfigured}
               onClick={toggleVoiceCall}
+              onFocus={() => void prewarmVoiceClient()}
+              onMouseEnter={() => void prewarmVoiceClient()}
               title={
                 isVoiceConfigured
                   ? voiceStatus === "connected" || voiceStatus === "connecting"
