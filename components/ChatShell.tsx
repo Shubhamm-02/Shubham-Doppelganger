@@ -49,10 +49,9 @@ function formatCitationLabel(path: string) {
 }
 
 const quickPrompts = [
-  "Why are you a good fit for this role?",
-  "What anti-spam guardrails are in CommentAI?",
-  "How does the PDF Grounded Chatbot avoid hallucinations?",
-  "Book a call"
+  "Why is Shubham a good fit for this role?",
+  "Tell me about CommentAI and the tradeoffs behind it.",
+  "Book a call tomorrow"
 ];
 
 function IconButton({
