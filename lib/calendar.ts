@@ -219,6 +219,21 @@ function extractName(text: string) {
     text.match(/\bthis is\s+([A-Z][A-Za-z.'-]*(?:\s+[A-Z][A-Za-z.'-]*){0,3})/i)?.[1];
 
   if (explicit) return cleanName(explicit);
+  const email = extractLatestEmail(text);
+  if (email) {
+    const compactName = text
+      .split(email)[0]
+      .split(/\n+/)
+      .at(-1);
+    if (compactName) {
+      const clean = cleanName(compactName)
+        .replace(/[^a-z\s.'-]/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (clean && !NAME_REJECT_PATTERN.test(clean)) return clean;
+    }
+  }
+
   const knownName = text
     .split(/\n+/)
     .map((line) => findKnownCallerName(cleanName(line)))
@@ -457,7 +472,7 @@ function extractTargetDateKey(text: string, timezone: string) {
   }
 
   const monthDatePattern = new RegExp(
-    `\\b(${MONTH_NAME_PATTERN})\\s+(${DAY_VALUE_PATTERN})(?:,?\\s*(20\\d{2}))?\\b`,
+    `\\b(${MONTH_NAME_PATTERN})[ \\t]+(${DAY_VALUE_PATTERN})(?:,?[ \\t]*(20\\d{2}))?\\b`,
     "gi"
   );
   for (const monthDate of lower.matchAll(monthDatePattern)) {
@@ -467,7 +482,7 @@ function extractTargetDateKey(text: string, timezone: string) {
   }
 
   const dayMonthDatePattern = new RegExp(
-    `\\b(${DAY_VALUE_PATTERN})(?:\\s+of)?\\s+(${MONTH_NAME_PATTERN})(?:,?\\s*(20\\d{2}))?\\b`,
+    `\\b(${DAY_VALUE_PATTERN})(?:[ \\t]+of)?[ \\t]+(${MONTH_NAME_PATTERN})(?:,?[ \\t]*(20\\d{2}))?\\b`,
     "gi"
   );
   for (const dayMonthDate of lower.matchAll(dayMonthDatePattern)) {

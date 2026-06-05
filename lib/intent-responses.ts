@@ -66,6 +66,21 @@ function hasStandaloneNameLine(message: string) {
     .some((line) => looksLikeName(line));
 }
 
+function hasSlotSelectionText(message: string) {
+  return /(^|\n)\s*[1-3]\s*(\n|$)|\b(first|second|third|slot\s*[1-3]|book\s+(the\s+)?(first|second|third))\b/i.test(
+    message
+  );
+}
+
+function isBookingDetailContinuation(message: string) {
+  return (
+    isBookingConfirmation(message) ||
+    hasExplicitName(message) ||
+    EMAIL_PATTERN.test(message) ||
+    /\b(confirm|confirmed|yes|yep|yeah|correct)\b/i.test(message)
+  );
+}
+
 function summarizeSchedulingDetails(message: string) {
   const email = message.match(EMAIL_PATTERN)?.[0];
   const hasDate = DATE_PATTERN.test(message);
@@ -118,7 +133,8 @@ export async function calendarIntentResponse(
   if (
     message &&
     details.hasDate &&
-    !isBookingConfirmation(latestMessage)
+    !hasSlotSelectionText(message) &&
+    !isBookingDetailContinuation(latestMessage)
   ) {
     const calendarResult = await getAvailability({
       text: message,
@@ -134,10 +150,12 @@ export async function calendarIntentResponse(
   }
 
   if (message && details.missing.length === 0) {
-    const calendarResult = isBookingConfirmation(latestMessage)
+    const shouldBook =
+      isBookingConfirmation(latestMessage) || hasSlotSelectionText(message);
+    const calendarResult = shouldBook
       ? await bookInterview({
           text: message,
-          selection: latestMessage,
+          selection: isBookingConfirmation(latestMessage) ? latestMessage : "",
           emailConfirmed: true
         })
       : await getAvailability({
