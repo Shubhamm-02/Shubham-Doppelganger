@@ -533,12 +533,21 @@ function localSlotInfo(slotStart: string, timezone: string) {
   };
 }
 
-function formatSlotLabel(slotStart: string, timezone: string) {
+function formatSlotDateTimeLabel(slotStart: string, timezone: string) {
   return new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
     weekday: "short",
     month: "short",
     day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  }).format(new Date(slotStart));
+}
+
+function formatSlotTimeLabel(slotStart: string, timezone: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
     hour: "numeric",
     minute: "2-digit",
     hour12: true
@@ -578,7 +587,7 @@ function flattenSlots(data: CalSlotsResponse["data"], timezone: string) {
         return {
           start,
           end,
-          label: formatSlotLabel(start, timezone)
+          label: formatSlotTimeLabel(start, timezone)
         };
       })
     )
@@ -795,7 +804,7 @@ export async function bookInterview(
     if (parsed.slotStart && !Number.isNaN(Date.parse(parsed.slotStart))) {
       selectedSlot = {
         start: new Date(parsed.slotStart).toISOString(),
-        label: formatSlotLabel(parsed.slotStart, timezone)
+        label: formatSlotDateTimeLabel(parsed.slotStart, timezone)
       };
     } else {
       const { displaySlots } = await fetchSlots(parsed);
@@ -838,7 +847,7 @@ export async function bookInterview(
 
     return {
       configured: true,
-      message: `Booked. The interview is confirmed for ${formatSlotLabel(
+      message: `Booked. The interview is confirmed for ${formatSlotDateTimeLabel(
         booking?.start || selectedSlot.start,
         timezone
       )}. A calendar invite should be sent to ${parsed.email}.${meetingLine}`,

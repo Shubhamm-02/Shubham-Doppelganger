@@ -1,4 +1,4 @@
-# Part C: Evals Report
+# Evals Report
 
 ## Project Summary
 
