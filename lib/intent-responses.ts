@@ -1,11 +1,16 @@
 import type { ProfileAnswer } from "@/lib/rag";
 import type { ChatIntent } from "@/lib/intent";
 import { bookInterview, getAvailability } from "@/lib/calendar";
+import { isKnownCallerName } from "@/lib/scheduling-names";
 
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const DATE_PATTERN =
   /\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b/i;
 const TIME_PATTERN = /\b(\d{1,2})(:\d{2})?\s*(am|pm)\b|\b\d{1,2}\s*-\s*\d{1,2}\b/i;
+const SCHEDULING_COMMAND_PATTERN =
+  /\b(book|schedule|set\s*up|call|meet|meeting|interview|slot|availability|available|calendar)\b/i;
+const NON_NAME_PATTERN =
+  /\b(ok|okay|yes|yep|yeah|no|confirm|confirmed|first|second|third|tomorrow|today|morning|afternoon|evening|night|received|name|email|mail|gmail|phone|number)\b/i;
 
 function isBookingConfirmation(message: string) {
   return (
@@ -16,65 +21,66 @@ function isBookingConfirmation(message: string) {
   );
 }
 
+function cleanNameCandidate(candidate: string) {
+  return candidate
+    .replace(EMAIL_PATTERN, " ")
+    .replace(/\b(email|mail|gmail|timezone|ist|utc|gmt|tomorrow|today|at|on|for|from)\b.*$/i, "")
+    .replace(/[^a-z\s.'-]+/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function looksLikeName(candidate: string) {
+  const clean = cleanNameCandidate(candidate);
+  if (isKnownCallerName(clean)) return true;
+  if (!clean || SCHEDULING_COMMAND_PATTERN.test(clean) || NON_NAME_PATTERN.test(clean)) {
+    return false;
+  }
+
+  const words = clean.split(/\s+/).filter(Boolean);
+  return (
+    words.length >= 1 &&
+    words.length <= 4 &&
+    words.every((word) => word.length > 1)
+  );
+}
+
+function hasExplicitName(message: string) {
+  const match = message.match(
+    /\b(?:my\s+name\s+is|name\s*(?::|is|-)|i\s+am|i'm|this\s+is)\s+([a-z][a-z\s.'-]{1,})/i
+  );
+
+  return Boolean(match?.[1] && looksLikeName(match[1]));
+}
+
+function hasCompactNameBeforeEmail(message: string, email?: string) {
+  if (!email) return false;
+
+  const beforeEmail = message.split(email)[0].split(/\n/).pop() ?? "";
+  return looksLikeName(beforeEmail);
+}
+
+function hasStandaloneNameLine(message: string) {
+  return message
+    .split(/\n+/)
+    .some((line) => looksLikeName(line));
+}
+
 function summarizeSchedulingDetails(message: string) {
   const email = message.match(EMAIL_PATTERN)?.[0];
   const hasDate = DATE_PATTERN.test(message);
   const hasSpecificTime = TIME_PATTERN.test(message);
   const withoutEmail = message.replace(EMAIL_PATTERN, " ");
-  const schedulingWords = new Set([
-    "ok",
-    "yes",
-    "yep",
-    "today",
-    "tomorrow",
-    "monday",
-    "tuesday",
-    "wednesday",
-    "thursday",
-    "friday",
-    "saturday",
-    "sunday",
-    "mon",
-    "tue",
-    "wed",
-    "thu",
-    "fri",
-    "sat",
-    "sun",
-    "ist",
-    "gmt",
-    "utc",
-    "est",
-    "edt",
-    "cst",
-    "cdt",
-    "mst",
-    "mdt",
-    "pst",
-    "pdt",
-    "cet",
-    "cest",
-    "bst",
-    "aest",
-    "aedt",
-    "am",
-    "pm"
-  ]);
-  const possibleNameTokens = withoutEmail
-    .toLowerCase()
-    .replace(/[^a-z\s.'-]+/g, " ")
-    .split(/\s+/)
-    .filter((token) => token.length > 1 && !schedulingWords.has(token));
   const hasName =
-    /\bname\s*(?::|is|-)\s*[a-z][a-z\s.'-]{1,}/i.test(withoutEmail) ||
-    /\b(i am|this is)\s+[a-z][a-z\s.'-]{1,}/i.test(withoutEmail) ||
-    possibleNameTokens.length >= 2;
+    hasExplicitName(withoutEmail) ||
+    hasCompactNameBeforeEmail(message, email) ||
+    hasStandaloneNameLine(withoutEmail);
 
   const missing = [];
   if (!hasName) missing.push("your name");
   if (!email) missing.push("your email");
   if (!hasDate) missing.push("the day/date");
-  if (!hasSpecificTime) missing.push("a specific time window");
+  if (!hasSpecificTime) missing.push("a preferred 15-minute time");
 
   return { email, hasDate, hasName, hasSpecificTime, missing };
 }
@@ -103,7 +109,7 @@ export async function calendarIntentResponse(
 
     return {
       answer:
-        "I can help schedule a 15-minute interview in India time. Tell me 2-3 windows that work for you (for example: Tue 2-5pm or Wed 11am-1pm), and I will propose slots from Shubham's real calendar.",
+        "I can help schedule a 15-minute interview in India time. Share a preferred day and exact 15-minute time, for example tomorrow 3:00 pm or tomorrow 3:00-3:15 pm.",
       citations: [],
       grounded: true,
       retrievalMode: "local-keyword"
@@ -131,14 +137,14 @@ export async function calendarIntentResponse(
       details.email ? `email: ${details.email}` : null,
       details.hasName ? "name: received" : null,
       details.hasDate ? "day/date: received" : null,
-      details.hasSpecificTime ? "time window: received" : null
+      details.hasSpecificTime ? "15-minute time: received" : null
     ].filter(Boolean);
 
     return {
       answer:
         `Got it${known.length ? ` (${known.join(", ")})` : ""}. ` +
         `I still need ${details.missing.join(", ")} before I can propose or book a 15-minute slot.` +
-        "\n\nExample: Shubham Shah, shubham@example.com, tomorrow 3-5pm.",
+        "\n\nExample: Shubham Shah, shubham@example.com, tomorrow 3:00 pm.",
       citations: [],
       grounded: true,
       retrievalMode: "local-keyword"
@@ -147,7 +153,7 @@ export async function calendarIntentResponse(
 
   return {
     answer:
-      "I can book a 15-minute interview in India time. Please share:\n\n1. Your name\n2. Your email (needed for the calendar invite)\n3. A preferred day/time window\n\nThen I will propose available slots and book it end-to-end.",
+      "I can book a 15-minute interview in India time. Please share:\n\n1. Your name\n2. Your email (needed for the calendar invite)\n3. A preferred day and exact 15-minute time\n\nThen I will check availability and book it end-to-end.",
     citations: [],
     grounded: true,
     retrievalMode: "local-keyword"
