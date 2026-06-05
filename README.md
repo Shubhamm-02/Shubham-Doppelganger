@@ -69,6 +69,10 @@ See `docs/architecture.md`.
 
 See `docs/demo-checklist.md`.
 
+## Evals Report
+
+See `docs/evals-report.md`.
+
 ## Day 1 Checklist
 
 See `docs/day-1-checklist.md`.
