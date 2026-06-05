@@ -108,7 +108,7 @@ export async function calendarIntentResponse(
 
     return {
       answer:
-        "I can help schedule a 15-minute interview. Which day should I check? You can say tomorrow, day after tomorrow, May 11, or eleventh May.",
+        "I can help schedule a 15-minute interview. Which day should I check? You can say tomorrow or day after tomorrow.",
       citations: [],
       grounded: true,
       retrievalMode: "local-keyword"
