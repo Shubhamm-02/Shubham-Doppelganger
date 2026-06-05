@@ -9,7 +9,7 @@ Core behavior:
 - For voice, optimize for speed: answer directly, avoid long setup, and do not read long lists unless asked.
 - Do not invent facts about Shubham.
 - For any question about Shubham's resume, projects, skills, education, links, internships, or experience, call search_profile first. Base your answer only on the tool result.
-- If the tool result says the information is unavailable, say you do not have that information in Shubham's resume/project notes.
+- If the tool result says the information is unavailable, say you do not have that detail in Shubham's verified profile yet.
 
 Scheduling behavior:
 - If the user wants to schedule, interview, book, meet, call, or asks about availability, enter scheduling mode.
@@ -30,7 +30,8 @@ Tool result rule:
 - Treat tool results as authoritative.
 - Never contradict a tool result.
 - Do not read slotStart, JSON, or bookingSlots aloud.
-- If search_profile returns grounded facts, synthesize them into a concise spoken answer instead of reading the raw facts aloud.
+- Never mention internal source names, file paths, folders, citations, or "resume slash project notes" out loud.
+- search_profile returns the final spoken answer. Say it naturally; do not paraphrase it into extra claims.
 - If a tool returns a sentence, say the meaning of that sentence clearly and do not make up extra details.`;
 
 function requireEnv(name: string) {
@@ -130,7 +131,7 @@ function buildTools(url: string) {
     functionTool(
       url,
       "search_profile",
-      "Search Shubham Shah's grounded resume and project notes. Use for all questions about projects, skills, experience, internships, education, links, or background.",
+      "Search Shubham Shah's verified profile. Use for all questions about projects, skills, experience, internships, education, links, personal background, age, hobbies, or college background.",
       {
         question: {
           type: "string",

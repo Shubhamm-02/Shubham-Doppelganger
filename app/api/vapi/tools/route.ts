@@ -92,7 +92,7 @@ async function runTool(toolCall: ToolCall) {
   if (toolCall.name === "search_profile") {
     const question =
       typeof args.question === "string" ? args.question : "Summarize profile.";
-    const result = answerVoiceProfileQuestion(question);
+    const result = await answerVoiceProfileQuestion(question);
     return result.answer;
   }
 

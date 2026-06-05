@@ -5,7 +5,7 @@ import type { RetrievedDocument } from "@/lib/vector-store";
 const DEFAULT_CHAT_MODEL = "gpt-4.1-mini";
 const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
 const REFUSAL =
-  "I do not have that information in the indexed resume or project notes.";
+  "I do not have that detail in Shubham's verified profile yet.";
 
 let client: OpenAI | null = null;
 
@@ -93,6 +93,53 @@ export async function generateGroundedAnswer(
       }
     ],
     temperature: 0.2
+  });
+
+  const answer = response.output_text?.trim();
+  return answer || REFUSAL;
+}
+
+export async function generateGroundedVoiceAnswer(
+  question: string,
+  documents: RetrievedDocument[]
+) {
+  const openai = getOpenAIClient();
+  const context = documents
+    .map((document, index) => {
+      return [
+        `[${index + 1}] ${document.source_name}`,
+        `Section: ${String(document.metadata?.sectionTitle ?? "Unknown")}`,
+        "",
+        document.content
+      ].join("\n");
+    })
+    .join("\n\n---\n\n");
+
+  const response = await openai.responses.create({
+    model: getChatModel(),
+    input: [
+      {
+        role: "system",
+        content: PERSONA_SYSTEM_PROMPT
+      },
+      {
+        role: "user",
+        content: [
+          "Answer this voice-agent question using only the verified context below.",
+          `If the context does not support the answer, reply exactly: ${REFUSAL}`,
+          "Return the final spoken answer only.",
+          "Keep it natural, concise, and under 45 words unless the user asks for detail.",
+          "Do not mention files, folders, source names, citations, markdown, or retrieval.",
+          "Do not read raw notes aloud.",
+          "",
+          `Question: ${question}`,
+          "",
+          "Verified context:",
+          context
+        ].join("\n")
+      }
+    ],
+    temperature: 0.15
   });
 
   const answer = response.output_text?.trim();
