@@ -50,6 +50,7 @@ const CAL_API_BASE_URL = "https://api.cal.com/v2";
 const DEFAULT_CAL_BOOKING_API_VERSION = "2026-02-25";
 const DEFAULT_CAL_SLOTS_API_VERSION = "2024-09-04";
 const DEFAULT_TIMEZONE = "Asia/Kolkata";
+const DEFAULT_HOST_EMAILS = ["shubhamshah473@gmail.com"];
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const WEEKDAYS = [
   "sunday",
@@ -257,8 +258,66 @@ function extractCalError(payload: unknown) {
       ? (details as Record<string, unknown>).message
       : undefined;
   const message = record.message || nestedMessage || detailMessage || record.error;
-  if (typeof message === "string") return message;
+  const detailText =
+    details && typeof details !== "string"
+      ? JSON.stringify(details).slice(0, 500)
+      : details;
+  if (typeof message === "string") {
+    return detailText && detailText !== message
+      ? `${message}: ${detailText}`
+      : message;
+  }
   return JSON.stringify(payload).slice(0, 500);
+}
+
+function normalizedEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+function getHostEmails() {
+  const configured = [
+    process.env.CAL_HOST_EMAILS,
+    process.env.CAL_HOST_EMAIL
+  ]
+    .filter(Boolean)
+    .join(",");
+  const emails = configured
+    ? configured.split(",").map((email) => normalizedEmail(email)).filter(Boolean)
+    : DEFAULT_HOST_EMAILS;
+
+  return new Set(emails);
+}
+
+function isHostEmail(email?: string) {
+  return Boolean(email && getHostEmails().has(normalizedEmail(email)));
+}
+
+function bookingFailureMessage(error: unknown) {
+  const detail = error instanceof Error ? error.message : String(error);
+  const lower = detail.toLowerCase();
+
+  if (
+    lower.includes("already booked") ||
+    lower.includes("not available") ||
+    lower.includes("slot")
+  ) {
+    return "That slot is no longer available. Please choose another proposed slot.";
+  }
+
+  if (
+    lower.includes("host") ||
+    lower.includes("owner") ||
+    lower.includes("organizer") ||
+    lower.includes("same email")
+  ) {
+    return "Cal.com rejected the booking because the attendee email appears to be Shubham's own email. Please use the interviewer's email address.";
+  }
+
+  if (lower.includes("email") || lower.includes("attendee")) {
+    return "Cal.com rejected the attendee details. Please use the interviewer's real email address and try again.";
+  }
+
+  return "Cal.com rejected the booking just now. Please try another proposed slot, or use a different attendee email.";
 }
 
 function dateKeyForTimeZone(date: Date, timezone: string) {
@@ -524,10 +583,10 @@ function formatSlotsMessage(slots: CalendarSlot[], preferredWindow: string) {
   }
 
   const formatted = slots
-    .map((slot, index) => `${index + 1}. ${slot.label}`)
-    .join("\n");
+    .map((slot, index) => `option ${index + 1}: ${slot.label}`)
+    .join("; ");
 
-  return `I found these available 15-minute interview slots for ${preferredWindow}:\n\n${formatted}\n\nReply with 1, 2, or 3.`;
+  return `I found these available 15-minute interview slots for ${preferredWindow}: ${formatted}. Which option do you want: 1, 2, or 3?`;
 }
 
 function formatDateKey(dateKey: string) {
@@ -673,6 +732,14 @@ export async function bookInterview(
     };
   }
 
+  if (isHostEmail(parsed.email)) {
+    return {
+      configured: true,
+      message:
+        "Please use the interviewer's email address, not Shubham's own email, so Cal.com can send the invite to the right attendee."
+    };
+  }
+
   try {
     const timezone = DEFAULT_TIMEZONE;
     let selectedSlot: CalendarSlot | undefined;
@@ -739,8 +806,7 @@ export async function bookInterview(
     console.error("Cal.com booking failed", error);
     return {
       configured: true,
-      message:
-        "I could not book the interview just now. Please try again in a moment, or choose another proposed slot."
+      message: bookingFailureMessage(error)
     };
   }
 }
