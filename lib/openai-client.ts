@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { PERSONA_SYSTEM_PROMPT } from "@/lib/prompts";
 import type { RetrievedDocument } from "@/lib/vector-store";
 
-const DEFAULT_CHAT_MODEL = "gpt-4.1-mini";
+const DEFAULT_CHAT_MODEL = "gpt-4.1";
 const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
 const REFUSAL =
   "I do not have that detail in Shubham's verified profile yet.";

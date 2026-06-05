@@ -308,9 +308,9 @@ async function main() {
     ],
     voice: tuneVoiceConfig(existingVoice),
     model: {
-      provider: existingModel.provider ?? "openai",
-      model: existingModel.model ?? "gpt-4o-mini",
       ...existingModel,
+      provider: "openai",
+      model: process.env.VAPI_MODEL?.trim() || "gpt-5-nano",
       temperature: 0.2,
       maxTokens: 180,
       messages: [
