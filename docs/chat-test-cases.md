@@ -1,4 +1,4 @@
-# Chat Test Cases (Day 3)
+# Chat Test Cases
 
 Use these to demo and sanity-check the public chat UI.
 
@@ -18,14 +18,18 @@ Expected:
 
 ## Booking/Availability Intents
 
-1. "Are you free next Tuesday afternoon?"
-2. "Can we schedule an interview?"
-3. "Book a call for tomorrow at 6pm IST."
+1. "Can we schedule an interview?"
+2. "Book a call"
+3. "Manya Nayak, recruiter@example.com, tomorrow"
+4. "1"
 
 Expected:
 
-- The assistant asks for timezone and a time window, or asks for name/email/timezone.
-- It does not invent availability or confirm a booking yet.
+- The assistant states or implies 15-minute slots.
+- The assistant asks for missing name/email/day details when needed.
+- The assistant shows up to three real Cal.com slots for the requested India-time day.
+- After the user chooses 1, 2, or 3, Cal.com creates the booking and sends the invite.
+- The assistant rejects Shubham's own email as the attendee email.
 
 ## Unsupported / Adversarial
 

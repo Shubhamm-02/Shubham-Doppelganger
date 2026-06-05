@@ -2,47 +2,23 @@
 
 RAG-grounded voice and chat persona for answering questions about Shubham Shah's resume, GitHub projects, and interview availability.
 
-## Current Status
+## Live Demo
 
-Day 3 scaffold is in progress:
-
-- Resume markdown and project notes are in `data/`.
-- Next.js app structure is created.
-- Chat UI, persistence, sessions, and copy/delete actions are implemented.
-- Markdown chunking is implemented.
-- OpenAI embedding ingestion is implemented.
-- Supabase document upsert and vector retrieval are implemented.
-- Local chunk search remains as a fallback when env keys are missing.
-- Vapi web calls are wired. Assistant tool configuration is handled by `npm run vapi:configure`.
-- Cal.com availability and booking are wired through `/api/calendar/*` and Vapi tools.
-
-The app is not production-ready yet. The next manual step is to run the Supabase schema, add real keys to `.env.local`, and run ingestion.
-
-## Setup
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Create local env:
-
-```bash
-cp .env.example .env.local
-```
-
-Run the dev server:
-
-```bash
-npm run dev
-```
-
-Open:
+The deployed chat is available at:
 
 ```text
-http://localhost:3000
+https://shubham-doppelganger.vercel.app/
 ```
+
+Use `docs/demo-checklist.md` for the recommended walkthrough.
+
+## What It Does
+
+- Answers questions from Shubham's resume and project notes using RAG.
+- Supports persistent web chat with sessions, copy actions, and a Poe/ChatGPT-inspired UI.
+- Supports Vapi voice calls through the same profile-search and scheduling tools.
+- Checks real Cal.com availability and books fixed 15-minute interviews.
+- Assumes India time for scheduling and blocks Shubham's own email as the attendee email.
 
 ## Data Sources
 
@@ -51,9 +27,13 @@ http://localhost:3000
 
 `data/resume.md` is the ingestion source. A matching PDF can be kept for humans, but the RAG pipeline does not need it.
 
-## Useful Commands
+## Developer Notes
+
+Useful local commands:
 
 ```bash
+npm install
+npm run dev
 npm run ingest:resume
 npm run ingest:github
 npm run vapi:configure
@@ -84,6 +64,10 @@ npm run vapi:configure
 ## Architecture
 
 See `docs/architecture.md`.
+
+## Demo Checklist
+
+See `docs/demo-checklist.md`.
 
 ## Day 1 Checklist
 

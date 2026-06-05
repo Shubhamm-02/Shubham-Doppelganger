@@ -30,8 +30,12 @@ Interviewer
 - Chat falls back to local chunk search when keys are missing.
 - Conversation logging is implemented for Supabase-backed chat.
 
-## Target State
+## Current Voice + Calendar State
 
-- Add Vapi tool-call webhook responses.
-- Add Cal.com availability and booking.
-- Log evaluations for chat groundedness and voice task completion.
+- Vapi uses the same deployed `/api/vapi/tools` endpoint as the chat backend.
+- Voice profile questions call `search_profile` before answering.
+- Scheduling is India-only and assumes `Asia/Kolkata`.
+- Calendar availability comes from Cal.com slots.
+- Calendar booking uses a fixed 15-minute Cal.com event type.
+- Shubham's own email addresses are blocked as attendee emails to avoid self-booking.
+- Chat and voice share the same calendar implementation, with voice adding explicit email confirmation.
