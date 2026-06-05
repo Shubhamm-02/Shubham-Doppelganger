@@ -73,7 +73,7 @@ const KNOWN_PROJECT_NAMES = [
 ];
 
 const SHUBHAM_NAME_MISHEARS =
-  /\b(?:shivam|shivaam|shibham|shubim|shubimshah|shubim shah|shubhamshah|shoobham|schubham)(?:'s)?\b/gi;
+  /\b(?:shivam|shivaam|shibham|shubim|shubimshah|shubim shah|shubhamshah|shubam|subham|chibham|chubham|chebo|shoobham|schubham)(?:'s)?\b/gi;
 const PROFILE_OVERVIEW_SECTIONS = new Set([
   "Profile",
   "Technical Skills",
