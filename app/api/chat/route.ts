@@ -63,9 +63,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const sessionInfo = hasSupabaseConfig()
-    ? await ensureChatSession(message, parsed.data.sessionId)
-    : null;
+  let sessionInfo: Awaited<ReturnType<typeof ensureChatSession>> | null = null;
+  if (hasSupabaseConfig()) {
+    try {
+      sessionInfo = await ensureChatSession(message, parsed.data.sessionId);
+    } catch (error) {
+      console.warn("Chat session setup failed. Continuing without session.", error);
+    }
+  }
   const sessionId = sessionInfo?.id;
   const recentTurns = sessionId
     ? await listRecentConversationTurns(sessionId).catch(() => [])

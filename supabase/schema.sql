@@ -1,5 +1,9 @@
 create extension if not exists vector;
 
+-- This deployment uses OpenAI text-embedding-3-small, which returns
+-- 1536-dimensional vectors. If you switch embedding providers, update
+-- these vector dimensions and rerun ingestion.
+
 create table if not exists documents (
   id bigserial primary key,
   source_type text not null,
@@ -72,6 +76,12 @@ create index if not exists documents_metadata_idx
 
 create unique index if not exists documents_source_path_chunk_idx
   on documents (source_path, chunk_index);
+
+drop index if exists documents_embedding_idx;
+
+alter table documents
+  alter column embedding type vector(1536)
+  using null::vector(1536);
 
 create index if not exists documents_embedding_idx
   on documents using hnsw (embedding vector_cosine_ops);

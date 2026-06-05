@@ -412,7 +412,70 @@ export async function answerVoiceProfileQuestion(
   };
 }
 
+async function localKeywordAnswerWithLLM(
+  normalizedQuestion: string,
+  sessionId: number | undefined,
+  startedAt: number
+): Promise<ProfileAnswer> {
+  const chunkMatches = searchLocalChunks(
+    normalizedQuestion,
+    isProjectQuestion(normalizedQuestion) ? 300 : 6
+  );
+
+  if (!chunkMatches.length) {
+    return localKeywordAnswer(normalizedQuestion);
+  }
+
+  const documentMatches = chunkMatches.map((m) => ({
+    chunk: m.chunk as DocumentChunk,
+    score: m.score
+  }));
+
+  const projectAnswer = isProjectQuestion(normalizedQuestion)
+    ? formatProjectAnswer(documentMatches)
+    : null;
+
+  if (projectAnswer) {
+    return {
+      answer: projectAnswer,
+      citations: Array.from(new Set(documentMatches.map((m) => m.chunk.sourcePath))),
+      grounded: true,
+      retrievalMode: "local-keyword"
+    };
+  }
+
+  if (hasOpenAIConfig()) {
+    try {
+      const documents = toRetrievedDocuments(documentMatches);
+      const answer = await generateGroundedAnswer(normalizedQuestion, documents);
+      const grounded = !isModelRefusal(answer);
+      await tryLogConversation({
+        channel: "chat",
+        sessionId,
+        userMessage: normalizedQuestion,
+        assistantMessage: answer,
+        retrievedDocumentIds: [],
+        grounded,
+        latencyMs: Date.now() - startedAt
+      });
+      return {
+        answer,
+        citations: grounded
+          ? Array.from(new Set(documentMatches.map((m) => m.chunk.sourcePath)))
+          : [],
+        grounded,
+        retrievalMode: "local-keyword"
+      };
+    } catch (llmError) {
+      console.warn("LLM synthesis failed during local fallback.", llmError);
+    }
+  }
+
+  return localKeywordAnswer(normalizedQuestion);
+}
+
 export async function answerProfileQuestion(
+
   question: string,
   options: { sessionId?: number } = {}
 ): Promise<ProfileAnswer> {
@@ -420,6 +483,14 @@ export async function answerProfileQuestion(
   const normalizedQuestion = normalizeProfileQuestion(question);
 
   if (!hasOpenAIConfig() || !hasSupabaseConfig()) {
+    if (hasOpenAIConfig()) {
+      return localKeywordAnswerWithLLM(
+        normalizedQuestion,
+        options.sessionId,
+        startedAt
+      );
+    }
+
     const fallback = localKeywordAnswer(normalizedQuestion);
     await tryLogConversation({
       channel: "chat",
@@ -492,6 +563,6 @@ export async function answerProfileQuestion(
     };
   } catch (error) {
     console.warn("Supabase vector RAG failed. Falling back locally.", error);
-    return localKeywordAnswer(normalizedQuestion);
+    return localKeywordAnswerWithLLM(normalizedQuestion, options.sessionId, startedAt);
   }
 }

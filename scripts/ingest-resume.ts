@@ -1,6 +1,10 @@
 import { loadEnvConfig } from "@next/env";
 import { buildProfileChunks } from "../lib/chunking";
-import { embedTexts, hasOpenAIConfig } from "../lib/openai-client";
+import {
+  embedTexts,
+  getExpectedEmbeddingDimensions,
+  hasOpenAIConfig
+} from "../lib/openai-client";
 import { hasSupabaseConfig } from "../lib/supabase";
 import { upsertDocumentChunks } from "../lib/vector-store";
 
@@ -33,6 +37,15 @@ async function main() {
 
   console.log(`\nEmbedding ${chunks.length} chunks...`);
   const embeddings = await embedTexts(chunks.map((chunk) => chunk.content));
+  const expectedDimensions = getExpectedEmbeddingDimensions();
+  const actualDimensions = embeddings[0]?.length;
+
+  if (actualDimensions !== expectedDimensions) {
+    throw new Error(
+      `Embedding dimension mismatch. ${process.env.OPENAI_EMBEDDING_MODEL ?? "default embedding model"} returned ${actualDimensions} dimensions, but the app expects ${expectedDimensions}. Update OPENAI_EMBEDDING_DIMENSIONS and the Supabase vector schema, then rerun ingestion.`
+    );
+  }
+
   const embeddedChunks = chunks.map((chunk, index) => ({
     ...chunk,
     embedding: embeddings[index]

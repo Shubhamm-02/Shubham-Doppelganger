@@ -16,8 +16,13 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const limit = Math.min(Number(url.searchParams.get("limit") ?? "12") || 12, 40);
 
-  const sessions = await listChatSessions(limit);
-  return NextResponse.json({ sessions });
+  try {
+    const sessions = await listChatSessions(limit);
+    return NextResponse.json({ sessions });
+  } catch (error) {
+    console.warn("Chat sessions unavailable.", error);
+    return NextResponse.json({ sessions: [] });
+  }
 }
 
 export async function POST(request: Request) {
@@ -34,8 +39,16 @@ export async function POST(request: Request) {
       ? body.title.trim()
       : "New chat";
 
-  const session = await createChatSession(title);
-  return NextResponse.json({ session });
+  try {
+    const session = await createChatSession(title);
+    return NextResponse.json({ session });
+  } catch (error) {
+    console.warn("Chat session creation failed.", error);
+    return NextResponse.json(
+      { error: "Chat sessions are temporarily unavailable." },
+      { status: 503 }
+    );
+  }
 }
 
 export async function DELETE(request: Request) {
@@ -56,6 +69,14 @@ export async function DELETE(request: Request) {
     );
   }
 
-  await deleteChatSession(sessionId);
-  return NextResponse.json({ ok: true });
+  try {
+    await deleteChatSession(sessionId);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.warn("Chat session deletion failed.", error);
+    return NextResponse.json(
+      { error: "Chat sessions are temporarily unavailable." },
+      { status: 503 }
+    );
+  }
 }

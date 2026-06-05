@@ -17,8 +17,29 @@ export function getEmbeddingModel() {
   return process.env.OPENAI_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL;
 }
 
+export function getExpectedEmbeddingDimensions() {
+  const configuredDimensions = Number(process.env.OPENAI_EMBEDDING_DIMENSIONS);
+  if (Number.isInteger(configuredDimensions) && configuredDimensions > 0) {
+    return configuredDimensions;
+  }
+
+  const model = getEmbeddingModel().toLowerCase();
+  if (
+    model.includes("gemini-embedding-001") ||
+    model.includes("text-embedding-3-large")
+  ) {
+    return 3072;
+  }
+
+  return 1536;
+}
+
 export function getChatModel() {
   return process.env.OPENAI_MODEL ?? DEFAULT_CHAT_MODEL;
+}
+
+export function getOpenAIBaseURL() {
+  return process.env.OPENAI_BASE_URL;
 }
 
 export function getOpenAIClient() {
@@ -26,7 +47,10 @@ export function getOpenAIClient() {
     throw new Error("Missing OPENAI_API_KEY.");
   }
 
-  client ??= new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  client ??= new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {})
+  });
   return client;
 }
 
@@ -66,9 +90,9 @@ export async function generateGroundedAnswer(
     })
     .join("\n\n---\n\n");
 
-  const response = await openai.responses.create({
+  const response = await openai.chat.completions.create({
     model: getChatModel(),
-    input: [
+    messages: [
       {
         role: "system",
         content: PERSONA_SYSTEM_PROMPT
@@ -95,7 +119,7 @@ export async function generateGroundedAnswer(
     temperature: 0.2
   });
 
-  const answer = response.output_text?.trim();
+  const answer = response.choices[0]?.message?.content?.trim();
   return answer || REFUSAL;
 }
 
@@ -115,9 +139,9 @@ export async function generateGroundedVoiceAnswer(
     })
     .join("\n\n---\n\n");
 
-  const response = await openai.responses.create({
+  const response = await openai.chat.completions.create({
     model: getChatModel(),
-    input: [
+    messages: [
       {
         role: "system",
         content: PERSONA_SYSTEM_PROMPT
@@ -142,7 +166,7 @@ export async function generateGroundedVoiceAnswer(
     temperature: 0.15
   });
 
-  const answer = response.output_text?.trim();
+  const answer = response.choices[0]?.message?.content?.trim();
   return answer || REFUSAL;
 }
 

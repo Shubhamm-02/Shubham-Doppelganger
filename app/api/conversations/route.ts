@@ -27,14 +27,16 @@ export async function GET(request: Request) {
     query = query.eq("session_id", sessionId);
   }
 
-  const { data, error } = await query.limit(limit);
+  try {
+    const { data, error } = await query.limit(limit);
 
-  if (error) {
-    return NextResponse.json(
-      { error: error.message, conversations: [] },
-      { status: 500 }
-    );
+    if (error) {
+      return NextResponse.json({ error: error.message, conversations: [] });
+    }
+
+    return NextResponse.json({ conversations: data ?? [] });
+  } catch (error) {
+    console.warn("Conversation history unavailable.", error);
+    return NextResponse.json({ conversations: [] });
   }
-
-  return NextResponse.json({ conversations: data ?? [] });
 }

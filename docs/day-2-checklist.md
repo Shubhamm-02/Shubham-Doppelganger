@@ -40,9 +40,12 @@
 5. Create `.env.local` from `.env.example`.
 6. Add:
    - `OPENAI_API_KEY`
+   - `OPENAI_BASE_URL=` unless you are intentionally using an OpenAI-compatible provider
+   - `OPENAI_MODEL=gpt-4.1-mini`
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `OPENAI_EMBEDDING_MODEL=text-embedding-3-small`
+   - `OPENAI_EMBEDDING_DIMENSIONS=1536`
 7. Run:
 
 ```bash
@@ -81,6 +84,13 @@ Expected behavior:
 - Answers should be generated from retrieved chunks.
 - Citations should point to source Markdown files.
 - Conversations should be logged in the `conversations` table.
+- `/api/health` should return `"ok": true`.
+
+## Production Troubleshooting
+
+- If `/api/health` says `API key not valid` and `baseURL` points to `generativelanguage.googleapis.com`, the app is sending an OpenAI key to Gemini. Clear `OPENAI_BASE_URL` and use OpenAI models, or replace the key with a valid Gemini key and update the vector dimension/schema for Gemini.
+- If `/api/health` says `Could not find the function public.match_documents` or a table is missing, run `supabase/schema.sql` in the Supabase SQL editor, then rerun `npm run ingest:resume`.
+- If `/api/health` says the documents table is empty, the schema exists but profile chunks have not been ingested yet.
 
 ## Notes
 
