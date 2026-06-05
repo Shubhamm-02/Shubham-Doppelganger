@@ -336,6 +336,10 @@ function bookingFailureMessage(error: unknown) {
     return "That slot is no longer available. Please choose another proposed slot.";
   }
 
+  if (lower.includes("lengthinminutes")) {
+    return "Cal.com rejected the booking because the event type already has a fixed 15-minute length. The booking request needs to be redeployed without that extra field.";
+  }
+
   if (
     lower.includes("host") ||
     lower.includes("owner") ||
@@ -811,7 +815,6 @@ export async function bookInterview(
       body: JSON.stringify({
         start: new Date(selectedSlot.start).toISOString(),
         eventTypeId,
-        lengthInMinutes: 15,
         attendee: {
           name: parsed.name,
           email: parsed.email,
