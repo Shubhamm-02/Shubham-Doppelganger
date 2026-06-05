@@ -5,8 +5,8 @@ This note stores grounded personal background facts for Wizard, Shubham Shah's A
 ## Basic Details
 
 - Shubham Shah was born on May 20, 2006.
-- As of May 10, 2026, Shubham is 19 years old.
-- Shubham turns 20 on May 20, 2026.
+- As of June 5, 2026, Shubham is 20 years old.
+- Shubham turned 20 on May 20, 2026.
 
 ## School Academics
 
