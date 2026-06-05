@@ -135,7 +135,11 @@ export async function calendarIntentResponse(
 
   if (message && details.missing.length === 0) {
     const calendarResult = isBookingConfirmation(latestMessage)
-      ? await bookInterview({ text: message, selection: latestMessage })
+      ? await bookInterview({
+          text: message,
+          selection: latestMessage,
+          emailConfirmed: true
+        })
       : await getAvailability({
           text: message,
           preferredWindow: message
@@ -160,7 +164,7 @@ export async function calendarIntentResponse(
       answer:
         `Got it${known.length ? ` (${known.join(", ")})` : ""}. ` +
         `I still need ${details.missing.join(", ")} before I can propose or book a 15-minute slot.` +
-        "\n\nExample: Shubham Shah, shubham@example.com, May 11.",
+        "\n\nExample: abc, abc@example.com, May 10.",
       citations: [],
       grounded: true,
       retrievalMode: "local-keyword"
