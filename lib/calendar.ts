@@ -23,6 +23,7 @@ type ParsedCalendarInput = {
   email?: string;
   emailConfirmed: boolean;
   preferredWindow?: string;
+  selection?: string;
   slotStart?: string;
   text: string;
 };
@@ -85,6 +86,46 @@ const MONTHS: Record<string, number> = {
   dec: 12,
   december: 12
 };
+const ORDINAL_DAYS: Record<string, number> = {
+  first: 1,
+  second: 2,
+  third: 3,
+  fourth: 4,
+  fifth: 5,
+  sixth: 6,
+  seventh: 7,
+  eighth: 8,
+  ninth: 9,
+  tenth: 10,
+  eleventh: 11,
+  twelfth: 12,
+  thirteenth: 13,
+  fourteenth: 14,
+  fifteenth: 15,
+  sixteenth: 16,
+  seventeenth: 17,
+  eighteenth: 18,
+  nineteenth: 19,
+  twentieth: 20,
+  "twenty first": 21,
+  "twenty second": 22,
+  "twenty third": 23,
+  "twenty fourth": 24,
+  "twenty fifth": 25,
+  "twenty sixth": 26,
+  "twenty seventh": 27,
+  "twenty eighth": 28,
+  "twenty ninth": 29,
+  thirtieth: 30,
+  "thirty first": 31
+};
+const MONTH_NAME_PATTERN = Object.keys(MONTHS)
+  .sort((first, second) => second.length - first.length)
+  .join("|");
+const ORDINAL_DAY_PATTERN = Object.keys(ORDINAL_DAYS)
+  .sort((first, second) => second.length - first.length)
+  .join("|");
+const DAY_VALUE_PATTERN = `(?:\\d{1,2}(?:st|nd|rd|th)?|${ORDINAL_DAY_PATTERN})`;
 
 function isCalendarConfigured() {
   return Boolean(process.env.CAL_API_KEY && process.env.CAL_EVENT_TYPE_ID);
@@ -131,6 +172,7 @@ function parseCalendarInput(input: Record<string, unknown>): ParsedCalendarInput
       booleanValue(input, "emailConfirmed") ||
       booleanValue(input, "confirmedEmail"),
     preferredWindow,
+    selection: stringValue(input, "selection"),
     slotStart: stringValue(input, "slotStart") || stringValue(input, "start"),
     text
   };
@@ -242,10 +284,40 @@ function currentYearInTimeZone(timezone: string) {
   return Number(dateKeyForTimeZone(new Date(), timezone).slice(0, 4));
 }
 
+function parseDayValue(value: string) {
+  const normalized = value
+    .toLowerCase()
+    .replace(/-/g, " ")
+    .replace(/\b(of|the)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const numeric = normalized.match(/^(\d{1,2})(?:st|nd|rd|th)?$/);
+  const day = numeric ? Number(numeric[1]) : ORDINAL_DAYS[normalized];
+
+  return Number.isInteger(day) && day >= 1 && day <= 31 ? day : undefined;
+}
+
+function dateKeyFromMonthDay(
+  monthName: string,
+  dayValue: string,
+  year: string | undefined,
+  timezone: string
+) {
+  const month = MONTHS[monthName.toLowerCase()];
+  const day = parseDayValue(dayValue);
+  if (!month || !day) return undefined;
+
+  return `${year ?? currentYearInTimeZone(timezone)}-${String(month).padStart(
+    2,
+    "0"
+  )}-${String(day).padStart(2, "0")}`;
+}
+
 function extractTargetDateKey(text: string, timezone: string) {
   const lower = text.toLowerCase();
   const today = dateKeyForTimeZone(new Date(), timezone);
 
+  if (/\b(day after tomorrow|day after tmrw)\b/i.test(text)) return addDays(today, 2);
   if (/\btoday\b/i.test(text)) return today;
   if (/\btomorrow\b/i.test(text)) return addDays(today, 1);
 
@@ -256,15 +328,25 @@ function extractTargetDateKey(text: string, timezone: string) {
   }
 
   const monthDate = lower.match(
-    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:,?\s*(20\d{2}))?\b/
+    new RegExp(
+      `\\b(${MONTH_NAME_PATTERN})\\s+(${DAY_VALUE_PATTERN})(?:,?\\s*(20\\d{2}))?\\b`,
+      "i"
+    )
   );
   if (monthDate) {
     const [, monthName, day, year] = monthDate;
-    const month = MONTHS[monthName];
-    return `${year ?? currentYearInTimeZone(timezone)}-${String(month).padStart(
-      2,
-      "0"
-    )}-${day.padStart(2, "0")}`;
+    return dateKeyFromMonthDay(monthName, day, year, timezone);
+  }
+
+  const dayMonthDate = lower.match(
+    new RegExp(
+      `\\b(${DAY_VALUE_PATTERN})(?:\\s+of)?\\s+(${MONTH_NAME_PATTERN})(?:,?\\s*(20\\d{2}))?\\b`,
+      "i"
+    )
+  );
+  if (dayMonthDate) {
+    const [, day, monthName, year] = dayMonthDate;
+    return dateKeyFromMonthDay(monthName, day, year, timezone);
   }
 
   const weekday = WEEKDAYS.find((day) => lower.includes(day.slice(0, 3)));
@@ -353,8 +435,7 @@ function formatSlotLabel(slotStart: string, timezone: string) {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-    hour12: true,
-    timeZoneName: "short"
+    hour12: true
   }).format(new Date(slotStart));
 }
 
@@ -431,16 +512,22 @@ function extractSlotSelection(input: Record<string, unknown>) {
   return 0;
 }
 
+function hasSlotSelectionText(text: string) {
+  return /^\s*[1-3]\s*$|\b(first|second|third|slot\s*[1-3]|book\s+(the\s+)?(first|second|third))\b/i.test(
+    text
+  );
+}
+
 function formatSlotsMessage(slots: CalendarSlot[], preferredWindow: string) {
   if (!slots.length) {
-    return `I checked Shubham's calendar for a 15-minute interview at ${preferredWindow}, but I could not find an open slot there. Please share another exact 15-minute time.`;
+    return `I checked Shubham's calendar for ${preferredWindow}, but I could not find an open 15-minute slot. Please share another day.`;
   }
 
   const formatted = slots
     .map((slot, index) => `${index + 1}. ${slot.label}`)
     .join("\n");
 
-  return `I found these available 15-minute interview slots for ${preferredWindow}:\n\n${formatted}\n\nReply with the slot number or say "book the first one" and I will confirm it.`;
+  return `I found these available 15-minute interview slots for ${preferredWindow}:\n\n${formatted}\n\nReply with 1, 2, or 3.`;
 }
 
 function formatDateKey(dateKey: string) {
@@ -457,11 +544,10 @@ function describePreferredWindow(parsed: ParsedCalendarInput, timezone: string) 
   const timeText = extractPreferredTimeText(text);
   const parts = [
     dateKey ? formatDateKey(dateKey) : null,
-    timeText?.toUpperCase(),
-    timezone
+    timeText?.toUpperCase()
   ].filter(Boolean);
 
-  return parts.length ? parts.join(", ") : "the requested window";
+  return parts.length ? parts.join(", ") : "the requested day";
 }
 
 async function fetchSlots(parsed: ParsedCalendarInput) {
@@ -514,10 +600,15 @@ function missingBookingFields(parsed: ParsedCalendarInput) {
     !parsed.preferredWindow &&
     !extractTargetDateKey(parsed.text, DEFAULT_TIMEZONE)
   ) {
-    missing.push("preferred day and exact 15-minute time");
+    missing.push("preferred day");
   }
-  if (!extractPreferredTimeWindow(`${parsed.text}\n${parsed.preferredWindow ?? ""}`)) {
-    missing.push("specific time");
+  const selectionText = `${parsed.selection ?? ""}\n${parsed.text}\n${parsed.preferredWindow ?? ""}`;
+  if (
+    !parsed.slotStart &&
+    !hasSlotSelectionText(selectionText) &&
+    !extractPreferredTimeWindow(selectionText)
+  ) {
+    missing.push("which proposed slot you want");
   }
   return missing;
 }
@@ -549,7 +640,7 @@ export async function getAvailability(
     return {
       configured: true,
       message:
-        "I could not check Shubham's calendar just now. Please try again in a moment, or share another exact India-time 15-minute slot."
+        "I could not check Shubham's calendar just now. Please try again in a moment, or share another day."
     };
   }
 }
