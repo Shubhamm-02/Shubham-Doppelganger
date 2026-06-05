@@ -51,7 +51,7 @@ function formatCitationLabel(path: string) {
 const quickPrompts = [
   "Why is Shubham a good fit for this role?",
   "Tell me about CommentAI and the tradeoffs behind it.",
-  "Book a call tomorrow"
+  "Book a call"
 ];
 
 function IconButton({
