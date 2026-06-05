@@ -10,6 +10,8 @@ Core behavior:
 - Do not invent facts about Shubham.
 - The caller is usually asking about Shubham even if speech-to-text hears "Shivam", "Shubim", "Shubhamshah", or a similar variant. Treat those as Shubham Shah silently. Never say you do not know "Shivam"; search Shubham's profile instead.
 - For any question about Shubham's resume, projects, skills, education, links, internships, or experience, call search_profile first. Base your answer only on the tool result.
+- Also call search_profile for broad or vague profile questions such as "tell me about him", "what can you tell me about Shubham", "give me a short brief", "who is he", "introduce Shubham", "what is his background", or "summarize the candidate".
+- When rewriting a vague profile question for search_profile, include Shubham's name and the user's intent. For example, rewrite "who is he" as "brief overview of Shubham Shah's background, education, skills, and projects".
 - If the tool result says the information is unavailable, say you do not have that detail in Shubham's verified profile yet.
 - If the caller says "stop", "pause", "wait", "hold on", "wait a minute", or "one second", stop your current response immediately and ask briefly, "Okay, what would you like to do?"
 
@@ -143,7 +145,7 @@ function buildTools(url: string) {
     functionTool(
       url,
       "search_profile",
-      "Search Shubham Shah's verified profile. Use for all questions about projects, skills, experience, internships, education, links, personal background, age, hobbies, or college background. Treat speech-to-text variants like Shivam, Shubim, Shubhamshah, or similar names as Shubham Shah.",
+      "Search Shubham Shah's verified profile. Use for all questions about projects, skills, experience, internships, education, links, personal background, age, hobbies, college background, broad summaries, introductions, or vague profile prompts like who is he or tell me about him. Treat speech-to-text variants like Shivam, Shubim, Shubhamshah, or similar names as Shubham Shah.",
       {
         question: {
           type: "string",

@@ -74,6 +74,15 @@ const KNOWN_PROJECT_NAMES = [
 
 const SHUBHAM_NAME_MISHEARS =
   /\b(?:shivam|shivaam|shibham|shubim|shubimshah|shubim shah|shubhamshah|shoobham|schubham)(?:'s)?\b/gi;
+const PROFILE_OVERVIEW_SECTIONS = new Set([
+  "Profile",
+  "Technical Skills",
+  "Education",
+  "Basic Details",
+  "Scaler School Of Technology",
+  "Degree And Academic Structure",
+  "Hobbies And Fitness"
+]);
 
 function normalizeProfileQuestion(question: string) {
   return question.replace(SHUBHAM_NAME_MISHEARS, (match) =>
@@ -128,6 +137,32 @@ function firstMeaningfulLine(content: string) {
 
 function isProjectQuestion(question: string) {
   return /\b(project|projects|built|github|portfolio|repo|repos)\b/i.test(question);
+}
+
+function isProfileOverviewQuestion(question: string) {
+  const normalized = normalizeProfileQuestion(question).toLowerCase();
+  return (
+    /\b(tell me about|brief|overview|summary|summarize|introduce|introduction|profile|background|who is|who's|describe)\b/.test(
+      normalized
+    ) &&
+      /\b(shubham|him|he|candidate|person|profile)\b/.test(normalized)
+  );
+}
+
+function profileOverviewMatches() {
+  return buildProfileChunks()
+    .filter((chunk) => {
+      const section = String(chunk.metadata.sectionTitle ?? "");
+      return (
+        (chunk.sourcePath === "data/resume.md" ||
+          chunk.sourcePath === "data/personal-background.md") &&
+        PROFILE_OVERVIEW_SECTIONS.has(section)
+      );
+    })
+    .map((chunk, index) => ({
+      chunk,
+      score: 10 - index * 0.2
+    }));
 }
 
 function cleanMarkdown(value: string) {
@@ -259,10 +294,13 @@ function searchLocalChunks(question: string, limit = 4) {
 
 function localKeywordAnswer(question: string): ProfileAnswer {
   const normalizedQuestion = normalizeProfileQuestion(question);
-  const chunkMatches = searchLocalChunks(
-    normalizedQuestion,
-    isProjectQuestion(normalizedQuestion) ? 300 : 4
-  );
+  const wantsOverview = isProfileOverviewQuestion(normalizedQuestion);
+  const chunkMatches = wantsOverview
+    ? profileOverviewMatches().slice(0, 5)
+    : searchLocalChunks(
+        normalizedQuestion,
+        isProjectQuestion(normalizedQuestion) ? 300 : 4
+      );
 
   if (!chunkMatches.length) {
     const sourceMatches = searchProfileSources(normalizedQuestion);
@@ -349,10 +387,13 @@ export async function answerVoiceProfileQuestion(
   question: string
 ): Promise<ProfileAnswer> {
   const normalizedQuestion = normalizeProfileQuestion(question);
-  const chunkMatches = searchLocalChunks(
-    normalizedQuestion,
-    isProjectQuestion(normalizedQuestion) ? 300 : 5
-  );
+  const wantsOverview = isProfileOverviewQuestion(normalizedQuestion);
+  const chunkMatches = wantsOverview
+    ? profileOverviewMatches().slice(0, 6)
+    : searchLocalChunks(
+        normalizedQuestion,
+        isProjectQuestion(normalizedQuestion) ? 300 : 5
+      );
 
   if (!chunkMatches.length) {
     return {
@@ -417,10 +458,13 @@ async function localKeywordAnswerWithLLM(
   sessionId: number | undefined,
   startedAt: number
 ): Promise<ProfileAnswer> {
-  const chunkMatches = searchLocalChunks(
-    normalizedQuestion,
-    isProjectQuestion(normalizedQuestion) ? 300 : 6
-  );
+  const wantsOverview = isProfileOverviewQuestion(normalizedQuestion);
+  const chunkMatches = wantsOverview
+    ? profileOverviewMatches().slice(0, 7)
+    : searchLocalChunks(
+        normalizedQuestion,
+        isProjectQuestion(normalizedQuestion) ? 300 : 6
+      );
 
   if (!chunkMatches.length) {
     return localKeywordAnswer(normalizedQuestion);
