@@ -66,11 +66,14 @@ const QUERY_SYNONYMS: Record<string, string[]> = {
 };
 
 const KNOWN_PROJECT_NAMES = [
+  "Wizard - Shubham Shah AI Representative",
+  "Shubham's Doppleganger",
   "PDF-Grounded Chatbot",
   "CommentAI",
   "CCPA Compliance Reasoning System",
   "CLI Agent"
 ];
+const WIZARD_PROJECT_PATH = "data/project-notes/Shubham's Doppleganger.md";
 
 const SHUBHAM_NAME_MISHEARS =
   /\b(?:shivam|shivaam|shibham|shubim|shubimshah|shubim shah|shubhamshah|shubam|subham|chibham|chubham|chebo|shoobham|schubham)(?:'s)?\b/gi;
@@ -139,6 +142,12 @@ function isProjectQuestion(question: string) {
   return /\b(project|projects|built|github|portfolio|repo|repos)\b/i.test(question);
 }
 
+function isWizardProjectQuestion(question: string) {
+  return /\b(this project|current project|wizard|doppelganger|doppleganger|ai representative|voice agent|voice assistant|chat interface|vapi|twilio|cal\.?com|scaler assessment|screening assignment)\b/i.test(
+    question
+  );
+}
+
 function isProfileOverviewQuestion(question: string) {
   const normalized = normalizeProfileQuestion(question).toLowerCase();
   return (
@@ -162,6 +171,15 @@ function profileOverviewMatches() {
     .map((chunk, index) => ({
       chunk,
       score: 10 - index * 0.2
+    }));
+}
+
+function wizardProjectMatches() {
+  return buildProfileChunks()
+    .filter((chunk) => chunk.sourcePath === WIZARD_PROJECT_PATH)
+    .map((chunk, index) => ({
+      chunk,
+      score: 14 - index * 0.2
     }));
 }
 
@@ -295,8 +313,11 @@ function searchLocalChunks(question: string, limit = 4) {
 function localKeywordAnswer(question: string): ProfileAnswer {
   const normalizedQuestion = normalizeProfileQuestion(question);
   const wantsOverview = isProfileOverviewQuestion(normalizedQuestion);
+  const wantsWizardProject = isWizardProjectQuestion(normalizedQuestion);
   const chunkMatches = wantsOverview
     ? profileOverviewMatches().slice(0, 5)
+    : wantsWizardProject
+      ? wizardProjectMatches().slice(0, 6)
     : searchLocalChunks(
         normalizedQuestion,
         isProjectQuestion(normalizedQuestion) ? 300 : 4
@@ -329,7 +350,7 @@ function localKeywordAnswer(question: string): ProfileAnswer {
     chunk: match.chunk as DocumentChunk,
     score: match.score
   }));
-  const projectAnswer = isProjectQuestion(normalizedQuestion)
+  const projectAnswer = !wantsWizardProject && isProjectQuestion(normalizedQuestion)
     ? formatProjectAnswer(documentMatches)
     : null;
 
@@ -388,8 +409,11 @@ export async function answerVoiceProfileQuestion(
 ): Promise<ProfileAnswer> {
   const normalizedQuestion = normalizeProfileQuestion(question);
   const wantsOverview = isProfileOverviewQuestion(normalizedQuestion);
+  const wantsWizardProject = isWizardProjectQuestion(normalizedQuestion);
   const chunkMatches = wantsOverview
     ? profileOverviewMatches().slice(0, 6)
+    : wantsWizardProject
+      ? wizardProjectMatches().slice(0, 6)
     : searchLocalChunks(
         normalizedQuestion,
         isProjectQuestion(normalizedQuestion) ? 300 : 5
@@ -408,7 +432,7 @@ export async function answerVoiceProfileQuestion(
     chunk: match.chunk as DocumentChunk,
     score: match.score
   }));
-  const projectAnswer = isProjectQuestion(normalizedQuestion)
+  const projectAnswer = !wantsWizardProject && isProjectQuestion(normalizedQuestion)
     ? formatProjectAnswer(documentMatches)
     : null;
 
@@ -459,8 +483,11 @@ async function localKeywordAnswerWithLLM(
   startedAt: number
 ): Promise<ProfileAnswer> {
   const wantsOverview = isProfileOverviewQuestion(normalizedQuestion);
+  const wantsWizardProject = isWizardProjectQuestion(normalizedQuestion);
   const chunkMatches = wantsOverview
     ? profileOverviewMatches().slice(0, 7)
+    : wantsWizardProject
+      ? wizardProjectMatches().slice(0, 7)
     : searchLocalChunks(
         normalizedQuestion,
         isProjectQuestion(normalizedQuestion) ? 300 : 6
@@ -475,7 +502,7 @@ async function localKeywordAnswerWithLLM(
     score: m.score
   }));
 
-  const projectAnswer = isProjectQuestion(normalizedQuestion)
+  const projectAnswer = !wantsWizardProject && isProjectQuestion(normalizedQuestion)
     ? formatProjectAnswer(documentMatches)
     : null;
 
@@ -525,6 +552,14 @@ export async function answerProfileQuestion(
 ): Promise<ProfileAnswer> {
   const startedAt = Date.now();
   const normalizedQuestion = normalizeProfileQuestion(question);
+
+  if (isWizardProjectQuestion(normalizedQuestion)) {
+    return localKeywordAnswerWithLLM(
+      normalizedQuestion,
+      options.sessionId,
+      startedAt
+    );
+  }
 
   if (!hasOpenAIConfig() || !hasSupabaseConfig()) {
     if (hasOpenAIConfig()) {
