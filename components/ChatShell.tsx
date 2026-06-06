@@ -282,10 +282,10 @@ export function ChatShell() {
       const decoder = new TextDecoder();
       let buffer = "";
       let streamedContent = "";
-      let animationFrameId: number | null = null;
+      let pendingStreamText = "";
+      let typewriterTimer: number | null = null;
 
       function flushStreamedContent() {
-        animationFrameId = null;
         setMessages((current) =>
           current.map((item) =>
             item.id === assistantMessageId
@@ -295,10 +295,23 @@ export function ChatShell() {
         );
       }
 
+      function pumpTypewriter() {
+        if (!pendingStreamText) {
+          typewriterTimer = null;
+          return;
+        }
+
+        const chunkSize = pendingStreamText.length > 240 ? 8 : 4;
+        streamedContent += pendingStreamText.slice(0, chunkSize);
+        pendingStreamText = pendingStreamText.slice(chunkSize);
+        flushStreamedContent();
+        typewriterTimer = window.setTimeout(pumpTypewriter, 18);
+      }
+
       function appendStreamedToken(token: string) {
-        streamedContent += token;
-        if (animationFrameId !== null) return;
-        animationFrameId = window.requestAnimationFrame(flushStreamedContent);
+        pendingStreamText += token;
+        if (typewriterTimer !== null) return;
+        typewriterTimer = window.setTimeout(pumpTypewriter, 0);
       }
 
       function handleStreamEvent(rawEvent: string) {
@@ -319,19 +332,21 @@ export function ChatShell() {
         }
 
         if (event === "done") {
-          if (animationFrameId !== null) {
-            window.cancelAnimationFrame(animationFrameId);
-            animationFrameId = null;
-          }
           if (payload?.sessionId && typeof payload.sessionId === "number") {
             setActiveSessionId(payload.sessionId);
+          }
+          if (payload?.answer && !streamedContent && !pendingStreamText) {
+            pendingStreamText = payload.answer;
+            if (typewriterTimer === null) {
+              typewriterTimer = window.setTimeout(pumpTypewriter, 0);
+            }
           }
           setMessages((current) =>
             current.map((item) =>
               item.id === assistantMessageId
                 ? {
                     ...item,
-                    content: payload.answer ?? item.content,
+                    content: item.content,
                     citations: payload.citations ?? [],
                     grounded: payload.grounded ?? undefined,
                     retrievalMode: payload.retrievalMode ?? undefined
