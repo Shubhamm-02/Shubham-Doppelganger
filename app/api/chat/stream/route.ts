@@ -46,6 +46,10 @@ function sse(event: string, data: unknown) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
+function sseComment(comment: string) {
+  return `: ${comment}\n\n`;
+}
+
 export async function POST(request: Request) {
   const startedAt = Date.now();
   const body = await request.json().catch(() => null);
@@ -67,11 +71,15 @@ export async function POST(request: Request) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      const sendComment = (comment: string) => {
+        controller.enqueue(encoder.encode(sseComment(comment)));
+      };
       const send = (event: string, data: unknown) => {
         controller.enqueue(encoder.encode(sse(event, data)));
       };
 
       try {
+        sendComment("stream-open " + " ".repeat(4096));
         let sessionInfo: Awaited<ReturnType<typeof ensureChatSession>> | null = null;
         if (hasSupabaseConfig()) {
           try {
