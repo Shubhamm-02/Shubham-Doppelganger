@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { PERSONA_SYSTEM_PROMPT } from "@/lib/prompts";
 import type { RetrievedDocument } from "@/lib/vector-store";
 
-const DEFAULT_CHAT_MODEL = "gpt-4.1";
+const DEFAULT_CHAT_MODEL = "gpt-4.1-mini";
 const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
 const REFUSAL =
   "I do not have that detail in Shubham's verified profile yet.";
@@ -121,6 +121,66 @@ export async function generateGroundedAnswer(
 
   const answer = response.choices[0]?.message?.content?.trim();
   return answer || REFUSAL;
+}
+
+export async function streamGroundedAnswer(
+  question: string,
+  documents: RetrievedDocument[],
+  onToken: (token: string) => void | Promise<void>
+) {
+  const openai = getOpenAIClient();
+  const context = documents
+    .map((document, index) => {
+      return [
+        `[${index + 1}] ${document.source_name}`,
+        `Path: ${document.source_path}`,
+        `Section: ${String(document.metadata?.sectionTitle ?? "Unknown")}`,
+        `Similarity: ${document.similarity.toFixed(3)}`,
+        "",
+        document.content
+      ].join("\n");
+    })
+    .join("\n\n---\n\n");
+
+  const stream = await openai.chat.completions.create({
+    model: getChatModel(),
+    messages: [
+      {
+        role: "system",
+        content: PERSONA_SYSTEM_PROMPT
+      },
+      {
+        role: "user",
+        content: [
+          "Answer the question using only the retrieved context below.",
+          `If the context does not support the answer, reply exactly: ${REFUSAL}`,
+          "Do not add facts that are not present in the context.",
+          "Be specific, concise, and interview-friendly.",
+          "Do not dump raw context or markdown source text.",
+          "If asked about projects, give 3-5 short bullets with project name, what it does, and why it matters.",
+          "If asked about skills or fit, synthesize the evidence into a clear recruiter-facing answer.",
+          "Keep the answer under 180 words unless the user asks for detail.",
+          "",
+          `Question: ${question}`,
+          "",
+          "Retrieved context:",
+          context
+        ].join("\n")
+      }
+    ],
+    temperature: 0.2,
+    stream: true
+  });
+
+  let answer = "";
+  for await (const chunk of stream) {
+    const token = chunk.choices[0]?.delta?.content ?? "";
+    if (!token) continue;
+    answer += token;
+    await onToken(token);
+  }
+
+  return answer.trim() || REFUSAL;
 }
 
 export async function generateGroundedVoiceAnswer(

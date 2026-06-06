@@ -41,7 +41,7 @@
 6. Add:
    - `OPENAI_API_KEY`
    - `OPENAI_BASE_URL=` unless you are intentionally using an OpenAI-compatible provider
-   - `OPENAI_MODEL=gpt-4.1`
+   - `OPENAI_MODEL=gpt-4.1-mini`
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `OPENAI_EMBEDDING_MODEL=text-embedding-3-small`

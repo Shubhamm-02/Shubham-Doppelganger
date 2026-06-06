@@ -4,7 +4,8 @@ import {
   generateGroundedAnswer,
   generateGroundedVoiceAnswer,
   hasOpenAIConfig,
-  isModelRefusal
+  isModelRefusal,
+  streamGroundedAnswer
 } from "@/lib/openai-client";
 import { searchProfileSources } from "@/lib/profile-data";
 import { hasSupabaseConfig } from "@/lib/supabase";
@@ -545,6 +546,84 @@ async function localKeywordAnswerWithLLM(
   return localKeywordAnswer(normalizedQuestion);
 }
 
+async function streamLocalKeywordAnswerWithLLM(
+  normalizedQuestion: string,
+  sessionId: number | undefined,
+  startedAt: number,
+  emit: (token: string) => void | Promise<void>
+): Promise<ProfileAnswer> {
+  const wantsOverview = isProfileOverviewQuestion(normalizedQuestion);
+  const wantsWizardProject = isWizardProjectQuestion(normalizedQuestion);
+  const chunkMatches = wantsOverview
+    ? profileOverviewMatches().slice(0, 7)
+    : wantsWizardProject
+      ? wizardProjectMatches().slice(0, 7)
+    : searchLocalChunks(
+        normalizedQuestion,
+        isProjectQuestion(normalizedQuestion) ? 300 : 6
+      );
+
+  if (!chunkMatches.length) {
+    const fallback = localKeywordAnswer(normalizedQuestion);
+    await emit(fallback.answer);
+    return fallback;
+  }
+
+  const documentMatches = chunkMatches.map((m) => ({
+    chunk: m.chunk as DocumentChunk,
+    score: m.score
+  }));
+
+  const projectAnswer = !wantsWizardProject && isProjectQuestion(normalizedQuestion)
+    ? formatProjectAnswer(documentMatches)
+    : null;
+
+  if (projectAnswer) {
+    await emit(projectAnswer);
+    return {
+      answer: projectAnswer,
+      citations: Array.from(new Set(documentMatches.map((m) => m.chunk.sourcePath))),
+      grounded: true,
+      retrievalMode: "local-keyword"
+    };
+  }
+
+  if (hasOpenAIConfig()) {
+    try {
+      const documents = toRetrievedDocuments(documentMatches);
+      const answer = await streamGroundedAnswer(
+        normalizedQuestion,
+        documents,
+        emit
+      );
+      const grounded = !isModelRefusal(answer);
+      await tryLogConversation({
+        channel: "chat",
+        sessionId,
+        userMessage: normalizedQuestion,
+        assistantMessage: answer,
+        retrievedDocumentIds: [],
+        grounded,
+        latencyMs: Date.now() - startedAt
+      });
+      return {
+        answer,
+        citations: grounded
+          ? Array.from(new Set(documentMatches.map((m) => m.chunk.sourcePath)))
+          : [],
+        grounded,
+        retrievalMode: "local-keyword"
+      };
+    } catch (llmError) {
+      console.warn("Streaming LLM synthesis failed during local fallback.", llmError);
+    }
+  }
+
+  const fallback = localKeywordAnswer(normalizedQuestion);
+  await emit(fallback.answer);
+  return fallback;
+}
+
 export async function answerProfileQuestion(
 
   question: string,
@@ -643,5 +722,117 @@ export async function answerProfileQuestion(
   } catch (error) {
     console.warn("Supabase vector RAG failed. Falling back locally.", error);
     return localKeywordAnswerWithLLM(normalizedQuestion, options.sessionId, startedAt);
+  }
+}
+
+export async function streamProfileQuestion(
+  question: string,
+  emit: (token: string) => void | Promise<void>,
+  options: { sessionId?: number } = {}
+): Promise<ProfileAnswer> {
+  const startedAt = Date.now();
+  const normalizedQuestion = normalizeProfileQuestion(question);
+
+  if (isWizardProjectQuestion(normalizedQuestion)) {
+    return streamLocalKeywordAnswerWithLLM(
+      normalizedQuestion,
+      options.sessionId,
+      startedAt,
+      emit
+    );
+  }
+
+  if (!hasOpenAIConfig() || !hasSupabaseConfig()) {
+    if (hasOpenAIConfig()) {
+      return streamLocalKeywordAnswerWithLLM(
+        normalizedQuestion,
+        options.sessionId,
+        startedAt,
+        emit
+      );
+    }
+
+    const fallback = localKeywordAnswer(normalizedQuestion);
+    await emit(fallback.answer);
+    await tryLogConversation({
+      channel: "chat",
+      sessionId: options.sessionId,
+      userMessage: question,
+      assistantMessage: fallback.answer,
+      retrievedDocumentIds: [],
+      grounded: fallback.grounded,
+      latencyMs: Date.now() - startedAt
+    });
+    return fallback;
+  }
+
+  try {
+    const [queryEmbedding] = await embedTexts([normalizedQuestion]);
+    const rawDocuments = await matchDocuments(queryEmbedding, {
+      matchCount: 14,
+      threshold: 0.12
+    });
+    const filteredDocuments = rawDocuments.filter(
+      (document) => !isBoilerplateSection(document.metadata?.sectionTitle)
+    );
+    const documents = (filteredDocuments.length ? filteredDocuments : rawDocuments).slice(
+      0,
+      10
+    );
+
+    if (!documents.length) {
+      await emit(REFUSAL);
+      await tryLogConversation({
+        channel: "chat",
+        sessionId: options.sessionId,
+        userMessage: question,
+        assistantMessage: REFUSAL,
+        retrievedDocumentIds: [],
+        grounded: false,
+        latencyMs: Date.now() - startedAt
+      });
+
+      return {
+        answer: REFUSAL,
+        citations: [],
+        grounded: false,
+        retrievalMode: "supabase-vector"
+      };
+    }
+
+    const answer = await streamGroundedAnswer(
+      normalizedQuestion,
+      documents,
+      emit
+    );
+    const grounded = !isModelRefusal(answer);
+    const citations = grounded
+      ? Array.from(new Set(documents.map((document) => document.source_path)))
+      : [];
+
+    await tryLogConversation({
+      channel: "chat",
+      sessionId: options.sessionId,
+      userMessage: question,
+      assistantMessage: answer,
+      retrievedDocumentIds: documents.map((document) => document.id),
+      grounded,
+      latencyMs: Date.now() - startedAt
+    });
+
+    return {
+      answer,
+      citations,
+      grounded,
+      retrievalMode: "supabase-vector"
+    };
+  } catch (error) {
+    console.warn("Supabase vector streaming RAG failed. Falling back locally.", error);
+    return streamLocalKeywordAnswerWithLLM(
+      normalizedQuestion,
+      options.sessionId,
+      startedAt,
+      emit
+    );
   }
 }

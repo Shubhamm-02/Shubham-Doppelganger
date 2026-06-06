@@ -240,13 +240,22 @@ export function ChatShell() {
       role: "user",
       content: message
     };
+    const assistantMessageId = crypto.randomUUID();
 
-    setMessages((current) => [...current, userMessage]);
+    setMessages((current) => [
+      ...current,
+      userMessage,
+      {
+        id: assistantMessageId,
+        role: "assistant",
+        content: ""
+      }
+    ]);
     setDraft("");
     setIsSending(true);
 
     try {
-      const response = await fetch("/api/chat", {
+      const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -265,21 +274,78 @@ export function ChatShell() {
         })
       });
 
-      const payload = await response.json();
-      if (payload?.sessionId && typeof payload.sessionId === "number") {
-        setActiveSessionId(payload.sessionId);
+      if (!response.ok || !response.body) {
+        throw new Error("Chat stream failed.");
       }
-      const assistantMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: payload.answer ?? "I could not produce an answer.",
-        citations: payload.citations ?? [],
-        grounded: payload.grounded ?? undefined,
-        retrievalMode: payload.retrievalMode ?? undefined
-      };
 
-      setMessages((current) => [...current, assistantMessage]);
-      setSchedulingMode(Boolean(payload?.schedulingActive));
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      function handleStreamEvent(rawEvent: string) {
+        const event = rawEvent.match(/^event:\s*(.+)$/m)?.[1]?.trim();
+        const dataLine = rawEvent.match(/^data:\s*(.+)$/m)?.[1];
+        if (!event || !dataLine) return;
+
+        const payload = JSON.parse(dataLine);
+
+        if (event === "meta" && typeof payload?.sessionId === "number") {
+          setActiveSessionId(payload.sessionId);
+          return;
+        }
+
+        if (event === "token" && typeof payload?.token === "string") {
+          setMessages((current) =>
+            current.map((item) =>
+              item.id === assistantMessageId
+                ? { ...item, content: item.content + payload.token }
+                : item
+            )
+          );
+          return;
+        }
+
+        if (event === "done") {
+          if (payload?.sessionId && typeof payload.sessionId === "number") {
+            setActiveSessionId(payload.sessionId);
+          }
+          setMessages((current) =>
+            current.map((item) =>
+              item.id === assistantMessageId
+                ? {
+                    ...item,
+                    content: payload.answer ?? item.content,
+                    citations: payload.citations ?? [],
+                    grounded: payload.grounded ?? undefined,
+                    retrievalMode: payload.retrievalMode ?? undefined
+                  }
+                : item
+            )
+          );
+          setSchedulingMode(Boolean(payload?.schedulingActive));
+          return;
+        }
+
+        if (event === "error") {
+          throw new Error(payload?.message ?? "Chat stream failed.");
+        }
+      }
+
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+        for (const rawEvent of events) {
+          handleStreamEvent(rawEvent);
+        }
+        if (done) break;
+      }
+
+      if (buffer.trim()) {
+        handleStreamEvent(buffer);
+      }
+
       fetch("/api/sessions?limit=20")
         .then((res) => res.json())
         .then((data) => {
@@ -287,15 +353,17 @@ export function ChatShell() {
         })
         .catch(() => {});
     } catch {
-      setMessages((current) => [
-        ...current,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content:
-            "I hit a local scaffold error while answering. The next step is to wire the API route and RAG service fully."
-        }
-      ]);
+      setMessages((current) =>
+        current.map((item) =>
+          item.id === assistantMessageId
+            ? {
+                ...item,
+                content:
+                  "I hit an error while streaming the answer. Please try again in a moment."
+              }
+            : item
+        )
+      );
     } finally {
       setIsSending(false);
     }
@@ -617,7 +685,9 @@ export function ChatShell() {
                   )}
                 </button>
               </div>
-              <div className="bubble-body">{message.content}</div>
+              <div className="bubble-body">
+                {message.content || (message.role === "assistant" ? "Thinking..." : "")}
+              </div>
               {message.citations?.length ? (
                 <div className="bubble-citations">
                   Sources:{" "}
@@ -628,14 +698,6 @@ export function ChatShell() {
               ) : null}
             </article>
           ))}
-          {isSending ? (
-            <article className="bubble assistant" aria-live="polite">
-              <div className="bubble-meta">
-                <span className="bubble-role">assistant</span>
-              </div>
-              <div className="bubble-body">Thinking...</div>
-            </article>
-          ) : null}
         </div>
 
         <form className="composer" onSubmit={sendMessage}>
