@@ -91,7 +91,7 @@ Required environment variables:
 ```bash
 OPENAI_API_KEY=
 OPENAI_BASE_URL=
-OPENAI_MODEL=gpt-4.1-mini
+OPENAI_CHAT_MODEL=gpt-4.1-mini
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 OPENAI_EMBEDDING_DIMENSIONS=1536
 

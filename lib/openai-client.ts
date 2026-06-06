@@ -35,7 +35,7 @@ export function getExpectedEmbeddingDimensions() {
 }
 
 export function getChatModel() {
-  return process.env.OPENAI_MODEL ?? DEFAULT_CHAT_MODEL;
+  return process.env.OPENAI_CHAT_MODEL ?? DEFAULT_CHAT_MODEL;
 }
 
 export function getOpenAIBaseURL() {
