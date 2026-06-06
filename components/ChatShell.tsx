@@ -281,6 +281,25 @@ export function ChatShell() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let streamedContent = "";
+      let animationFrameId: number | null = null;
+
+      function flushStreamedContent() {
+        animationFrameId = null;
+        setMessages((current) =>
+          current.map((item) =>
+            item.id === assistantMessageId
+              ? { ...item, content: streamedContent }
+              : item
+          )
+        );
+      }
+
+      function appendStreamedToken(token: string) {
+        streamedContent += token;
+        if (animationFrameId !== null) return;
+        animationFrameId = window.requestAnimationFrame(flushStreamedContent);
+      }
 
       function handleStreamEvent(rawEvent: string) {
         const event = rawEvent.match(/^event:\s*(.+)$/m)?.[1]?.trim();
@@ -295,17 +314,15 @@ export function ChatShell() {
         }
 
         if (event === "token" && typeof payload?.token === "string") {
-          setMessages((current) =>
-            current.map((item) =>
-              item.id === assistantMessageId
-                ? { ...item, content: item.content + payload.token }
-                : item
-            )
-          );
+          appendStreamedToken(payload.token);
           return;
         }
 
         if (event === "done") {
+          if (animationFrameId !== null) {
+            window.cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+          }
           if (payload?.sessionId && typeof payload.sessionId === "number") {
             setActiveSessionId(payload.sessionId);
           }
