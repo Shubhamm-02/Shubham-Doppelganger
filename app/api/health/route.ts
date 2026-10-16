@@ -125,7 +125,7 @@ async function runChecks() {
       checks.llm.error = errorMessage(error);
     }
   } else {
-    checks.llm.error = "OPENAI_API_KEY is missing.";
+    checks.llm.error = "OPENAI_API_KEY is not set, so vector search is off and retrieval uses local keyword search.";
   }
 
   if (checks.groq.configured) {
@@ -198,7 +198,8 @@ async function runChecks() {
     checks.supabase.error = "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing.";
   }
 
-  return { ok: checks.llm.ok && checks.supabase.ok, checks };
+  // Healthy means the site can answer: any working model provider plus the session store.
+  return { ok: (checks.llm.ok || checks.groq.ok) && checks.supabase.ok, checks };
 }
 
 // Anonymous callers share one cached run so the public URL cannot be used to spend OpenAI or Supabase quota.

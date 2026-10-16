@@ -215,7 +215,7 @@ columns and `match_documents`.
 | --- | --- | --- | --- | --- |
 | `VISITOR_COOKIE_SECRET` | Production | `lib/visitor.ts` | Dev-only constant | At least 32 characters; chat and history return 503 in production without it. |
 | `HEALTH_TOKEN` | No | `/api/health` | - | At least 32 characters; unlocks health details. |
-| `OPENAI_API_KEY` | For LLM answers and vector search | `lib/llm/client.ts` | - | Without it: heuristic routing, local search, extractive answers. |
+| `OPENAI_API_KEY` | For vector search | `lib/llm/client.ts` | - | Without it, retrieval uses local keyword search over `data/`, and answers and routing use Groq when `GROQ_API_KEY` is set (otherwise heuristic routing and extractive answers). |
 | `OPENAI_BASE_URL` | No | `lib/llm/client.ts` | OpenAI | For an OpenAI-compatible provider. |
 | `OPENAI_CHAT_MODEL` | No | `lib/llm/client.ts` | `gpt-4.1-mini` | Grounded answers. |
 | `OPENAI_ROUTER_MODEL` | No | `lib/chat/router.ts` | `gpt-4.1-nano` | Intent classifier. |
