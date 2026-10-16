@@ -90,6 +90,18 @@ beforeEach(() => {
 });
 
 describe("streamProfileAnswer", () => {
+  it("points grade questions to Shubham instead of answering or refusing", async () => {
+    configure({ openAI: false, groq: true, supabase: false });
+
+    const { result, tokens } = await collect("What is his CGPA?", { style: "voice" });
+
+    expect(mocks.streamGroundedAnswer).not.toHaveBeenCalled();
+    expect(tokens).toEqual([result.answer]);
+    expect(result.answer).toMatch(/prefers to share his grades directly/);
+    expect(result.answer).not.toMatch(/\d\.\d/);
+    expect(result.sources).toEqual([]);
+  });
+
   it("answers from local search without any LLM when OpenAI is not configured", async () => {
     configure({ openAI: false, supabase: false });
 

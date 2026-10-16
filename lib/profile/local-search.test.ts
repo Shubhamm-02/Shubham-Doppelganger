@@ -15,8 +15,7 @@ describe("searchLocalChunks", () => {
     ["What are Shubham's hobbies?", "data/personal-background.md"],
     ["What did Shubham build at CommentAI?", "data/project-notes/comment-ai.md"],
     ["What are Shubham Shah's skills?", "data/resume.md"],
-    ["Where does Shubham study?", "data/personal-background.md"],
-    ["What backend work has he done outside of AI?", "data/resume.md"]
+    ["Where does Shubham study?", "data/personal-background.md"]
   ])("ranks the right note first for %j", (question, path) => {
     const [top] = searchLocalChunks(question);
 
@@ -36,6 +35,27 @@ describe("searchLocalChunks", () => {
 
     expect(sections).toContain("data/resume.md :: Education");
     expect(sections.some((section) => section.endsWith(":: What It Does"))).toBe(false);
+  });
+
+  it("answers non-AI backend questions from the Spring Boot work and the resume's skills", () => {
+    const paths = searchLocalChunks("What backend work has he done outside of AI?")
+      .slice(0, 3)
+      .map((chunk) => chunk.path);
+
+    expect(paths).toContain("data/project-notes/bits-sga.md");
+    expect(paths).toContain("data/resume.md");
+  });
+
+  it.each([
+    ["What are his achievements?", "HACKHAZARDS"],
+    ["Did he win any hackathons?", "HACKHAZARDS"],
+    ["How old is he?", "Basic Details"]
+  ])("finds the resume or background entry for %j", (question, section) => {
+    const sections = searchLocalChunks(question)
+      .slice(0, 2)
+      .map((chunk) => chunk.section);
+
+    expect(sections.some((name) => name.startsWith(section))).toBe(true);
   });
 
   it("keeps placeholder sections out of the top results", () => {

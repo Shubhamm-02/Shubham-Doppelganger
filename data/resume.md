@@ -1,65 +1,97 @@
 # Shubham Shah
 
-**AI/ML Engineer | LLM Agents & RAG Systems**
+**Software Engineer | AI/ML Engineer | LLM Systems | Full-Stack Development**
 
-[shubhamshah473@gmail.com](mailto:shubhamshah473@gmail.com) | 7415141976 | [github.com/shubhamm-02](https://github.com/shubhamm-02) | [linkedin.com/in/shubham-shah2006](https://www.linkedin.com/in/shubham-shah2006/)
+[shubhamshah473@gmail.com](mailto:shubhamshah473@gmail.com) | +91-7415141976 | [github.com/Shubhamm-02](https://github.com/shubhamm-02) | [linkedin.com/in/shubham-shah2006](https://www.linkedin.com/in/shubham-shah2006/)
 
 ## Profile
 
-AI systems-focused undergraduate building production-grade LLM agents and retrieval systems for real-world workflows. Experienced in designing multi-step agent pipelines, integrating AI with APIs and data systems, and deploying scalable solutions. Strong interest in applying AI to optimize business processes, automate decision-making, and improve operational efficiency.
+AI systems-focused undergraduate building production-grade LLM agents, RAG applications, developer tools, and workflow automation products. Experienced in designing multi-step AI pipelines, integrating APIs and databases, building scalable full-stack systems, and deploying real-world products with strong guardrails, retrieval quality, and user-facing reliability.
 
 ## Technical Skills
 
-**Agent & LLM Systems:** Autonomous Agents, Multi-step Workflows, RAG Pipelines, Prompt Engineering, Tool Use, Guardrails  
-**Machine Learning:** Transformers, Embeddings, XGBoost, Semantic Search  
-**Data Systems:** Document Parsing, Chunking, Knowledge Indexing, Vector Search (FAISS), TF-IDF  
-**Evaluation:** Precision, Recall, F1-score, Benchmarking, Error Analysis  
-**Programming:** Python, Java, SQL  
-**Frameworks/Tools:** FastAPI, Spring Boot, scikit-learn, Pandas, NumPy, Docker, Git, Linux  
-**Systems:** REST APIs, Async Pipelines, Workflow Orchestration, Cloud Deployment (Render)
+**Languages:** Python, TypeScript, JavaScript, Java, SQL  
+**Frontend:** React, Next.js, Tailwind CSS, React Flow, Streamlit  
+**Backend:** FastAPI, Next.js API Routes, Spring Boot, REST APIs, Webhooks, Prisma  
+**AI / LLM Systems:** RAG, LLM Agents, Tool Calling, Prompt Engineering, Guardrails, Embeddings, Semantic Search  
+**Agents & Workflows:** Vapi, Cal.com, Trigger.dev, OpenAI API, Gemini, Ollama, Async Pipelines, Workflow Orchestration  
+**Databases:** PostgreSQL, Supabase pgvector, Neon, Neo4j AuraDB, FAISS  
+**Cloud & DevOps:** Vercel, Render, Docker, Git, Linux, Clerk, Transloadit
 
 ## Education
 
-**BITS Pilani Digital + Scaler School of Technology**  
+**BITS Pilani Digital**  
 2024 -- Present  
-B.Sc. in Computer Science Engineering + M.Sc. (Woolf University)  
-**CGPA: 9.6 / 10.0**
+B.Sc. in Computer Science Engineering
+
+**Scaler School of Technology**  
+2024 -- Present  
+M.Sc. from Woolf University
+
+## Achievements
+
+### HACKHAZARDS '26: Global Rank 5 Overall + Rank 3, Neo4j Track
+
+Aug 2026
+
+- Placed 5th overall and 3rd in the Neo4j Track with **BlastRadius**, a codebase impact analyzer, among **2,657** final project submissions from builders across 51 countries.
+
+### 1st Place, Unbounded Creativity with TRAE Hackathon (Nasiko Track)
+
+May 2026
+
+- Built an agent load balancing system for routing requests across multiple active agent instances using Round Robin, Least Connections, Random, P2C, and Consistent Hashing with Bounded Loads, with health checks and real-time request distribution monitoring.
 
 ## Projects
 
-### PDF Grounded Chatbot (PDF RAG + Citations + Guardrails)
+### Wizard: AI Representative
+
+[GitHub](https://github.com/Shubhamm-02/Shubham-Doppelganger) | [Live](https://shubham-doppelganger.vercel.app/)
+
+Tech: Next.js, TypeScript, RAG, Supabase pgvector, Vapi, Cal.com, Tool Calling
+
+- Built a deployed AI representative that answers questions about my resume and projects via RAG-grounded chat and voice.
+- Implemented Supabase pgvector retrieval over embedded project chunks, with keyword fallback and refusal guardrails.
+- Integrated a Vapi voice agent with tool calling and Cal.com scheduling to book real **15-minute interviews** end-to-end.
+- Evaluated voice latency, task completion, groundedness, and retrieval quality; fixed failure modes across scheduling and RAG flows.
+
+### Galaxy AI Workflow Builder Clone
+
+Tech: Next.js, TypeScript, React Flow, Prisma, Neon, Clerk, Trigger.dev, Gemini, Transloadit
+
+- Built a deployed Galaxy AI-style workflow builder on a React Flow canvas with custom Request-Inputs, Crop Image, Gemini, and Response nodes, dashboard CRUD, and JSON import/export.
+- Implemented typed **DAG validation**, full/single/partial workflow runs, animated execution state, and run history.
+- Integrated Clerk auth, Neon/PostgreSQL persistence, Trigger.dev background tasks, Gemini fallbacks, and Transloadit uploads.
+- Added image crop previews and **30-second** background crop execution using FFmpeg with a Sharp fallback for production resilience.
+
+### BlastRadius: Codebase Impact Analyzer
+
+[GitHub](https://github.com/Shubhamm-02/BlastRadius)
+
+Tech: Next.js, TypeScript, ts-morph, Neo4j AuraDB, Graph Visualization, AI Explanations
+
+- Built a developer tool that ingests TypeScript/JavaScript repositories and maps functions, imports, and call relationships into **Neo4j AuraDB**.
+- Used ts-morph for AST parsing and symbol resolution, avoiding hand-rolled parsing while supporting real-world code structures.
+- Implemented Cypher graph traversal to show the **blast radius** of changing any function, including affected upstream dependencies.
+- Built an interactive graph UI with project-scoped analysis, GitHub repo ingestion, and AI-generated plain-English impact summaries.
+
+### PDF Grounded Chatbot
 
 [GitHub](https://github.com/Shubhamm-02/Stair-Digital) | [Live](https://stair-digital.streamlit.app/)
 
-- Built a PDF-constrained Streamlit chatbot that answers questions strictly from uploaded PDFs with page-number citations.
-- Implemented local PDF parsing with PyMuPDF and lexical retrieval to supply only relevant page excerpts to the OpenAI Responses API.
-- Designed grounding guardrails to refuse unsupported queries with a fixed out-of-scope response and reject uncited answers.
-- Added conservative extractive fallback and multilingual support while preserving citation reliability across valid PDF-based queries.
+Tech: Python, Streamlit, PyMuPDF, OpenAI Responses API, Retrieval, Guardrails
 
-### CommentAI — Autonomous AI Agent (LLM + Workflow Automation + Monitoring)
+- Built a PDF-constrained chatbot that answers strictly from uploaded PDFs with page-number citations.
+- Implemented PDF parsing, lexical retrieval, refusal guardrails, conservative fallback, and multilingual support.
 
-[GitHub](https://github.com/shubhamm-02/CommentAI)
+## Certifications
 
-- Built a fully autonomous AI agent that engages with Instagram and LinkedIn posts using a locally hosted LLM (Llama-3 via Ollama).
-- Designed end-to-end workflow system for content discovery, decision-making, generation, and execution.
-- Processed comments **10+ posts/day** with automated scheduling, human-like delays, and execution pipelines.
-- Implemented advanced guardrails (duplicate prevention, creator cooldowns, semantic filtering), reducing spam/irrelevant outputs by **~40%**.
-- Developed real-time FastAPI + React dashboard to monitor agent activity, engagement metrics, and system behavior.
-- Eliminated API dependency via local inference, reducing operational cost to **zero** and improving control over deployment.
+- JPMorganChase – Software Engineering Job Simulation – Forage (Jan 2026)
+- Deloitte Australia – Data Analytics Job Simulation – Forage (Jan 2026)
 
-### CCPA Compliance AI System (Enterprise Legal Reasoning + RAG)
+## Volunteering
 
-[GitHub](https://github.com/Shubhamm-02/ccpa-reasoning-system)
+### Yugaantar Tech Fest: Vendor Management Team
 
-- Built AI system to analyze business workflows and detect regulatory violations using legal document retrieval.
-- Indexed **10k+ legal text chunks** and improved retrieval precision by **~20%**.
-- Designed constrained reasoning pipeline reducing unsupported outputs by **~30%**.
-- Structured outputs for reliable downstream decision-making and compliance evaluation.
-
-### Razorpay E-commerce Backend (Systems + Payments + Workflows)
-
-[GitHub](https://github.com/Shubhamm-02/razorpay-ecommerce-demo-spring-boot)
-
-- Built backend supporting concurrent users with end-to-end order and payment workflows.
-- Integrated Razorpay APIs with secure verification and webhook-driven processing.
-- Designed transactional systems ensuring reliability in order lifecycle and failure handling.
+- Sourced vendors for stage setup, generators, and fest needs; collected quotations, negotiated costs, and submitted final proposals.
+- Coordinated with vendors and college stakeholders under tight deadlines to keep event execution on schedule.

@@ -20,6 +20,10 @@ export function isRecentWorkQuestion(question: string) {
   return /\bworking on\b/i.test(question) || (RECENCY.test(question) && WORK.test(question));
 }
 
+export function isGradeQuestion(question: string) {
+  return /\b(?:cgpa|gpa|cgr|grades?|grade point)\b/i.test(question);
+}
+
 export function isProjectListQuestion(question: string) {
   return (
     /\b(projects|repos|repositories|portfolio)\b/i.test(question) &&

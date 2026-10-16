@@ -64,8 +64,9 @@ const STOP_WORDS = new Set([
 ]);
 
 const EDUCATION_TERMS = ["education", "degree", "college", "scaler", "bits", "pilani", "cgpa"];
+const ACHIEVEMENT_TERMS = ["hackathon", "hackhazard", "rank", "place", "certification"];
 
-// Keys and values are stems (see `stem`), so "studying" and "grades" find them too.
+// Keys are stems (see `stem`), so "studying" and "grades" find them; values are stemmed on use.
 const QUERY_SYNONYMS: Record<string, string[]> = {
   age: ["born", "birth", "birthday", "old", "year"],
   born: ["birth", "birthday", "age", "old", "year"],
@@ -78,7 +79,14 @@ const QUERY_SYNONYMS: Record<string, string[]> = {
   grade: ["cgpa", "education", "score", "academic"],
   cgpa: ["grade", "education", "academic"],
   hobby: ["badminton", "gym", "fitness", "chess"],
-  backend: ["api", "server", "spring", "boot", "database", "payment", "razorpay"]
+  backend: ["api", "server", "spring", "boot", "database", "payment", "razorpay"],
+  achievement: ACHIEVEMENT_TERMS,
+  award: ACHIEVEMENT_TERMS,
+  win: ACHIEVEMENT_TERMS,
+  won: ACHIEVEMENT_TERMS,
+  winner: ACHIEVEMENT_TERMS,
+  hackathon: ["hackhazard", "rank"],
+  certificate: ["certification", "forage", "simulation"]
 };
 
 const KNOWN_PROJECT_NAMES = [
@@ -120,7 +128,7 @@ function stem(token: string) {
     return /([b-df-hj-np-tv-z])\1$/.test(base) ? base.slice(0, -1) : base;
   }
   if (token.length > 4 && token.endsWith("ed") && !token.endsWith("eed")) return token.slice(0, -2);
-  if (token.length > 3 && token.endsWith("s") && !/(?:ss|us|is)$/.test(token)) {
+  if (token.length > 3 && token.endsWith("s") && !/(?:ss|us)$/.test(token) && !(token.length > 4 && token.endsWith("is"))) {
     return token.slice(0, -1);
   }
   return token;
@@ -131,6 +139,7 @@ function tokenize(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9+#.]+/g, " ")
     .split(/\s+/)
+    .map((token) => token.replace(/^\.+|\.+$/g, ""))
     .filter((token) => token.length > 2 && !STOP_WORDS.has(token))
     .map(stem);
 }
@@ -139,7 +148,7 @@ function expandQueryTokens(tokens: string[]) {
   const expanded = new Set(tokens);
   for (const token of tokens) {
     for (const synonym of QUERY_SYNONYMS[token] ?? []) {
-      expanded.add(synonym);
+      expanded.add(stem(synonym));
     }
   }
   return Array.from(expanded);

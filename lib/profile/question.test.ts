@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isGradeQuestion,
   isProfileOverviewQuestion,
   isProjectListQuestion,
   isProjectQuestion,
@@ -68,6 +69,22 @@ describe("isRecentWorkQuestion", () => {
     "leaves %j to the normal path",
     (question) => {
       expect(isRecentWorkQuestion(question)).toBe(false);
+    }
+  );
+});
+
+describe("isGradeQuestion", () => {
+  it.each(["What is his CGPA?", "How are his grades?", "What's his GPA at BITS?", "What CGR does he have at Scaler?"])(
+    "recognises %j",
+    (question) => {
+      expect(isGradeQuestion(question)).toBe(true);
+    }
+  );
+
+  it.each(["Where does he study?", "What degree is he pursuing?", "What were the upgrades in CommentAI?"])(
+    "ignores %j",
+    (question) => {
+      expect(isGradeQuestion(question)).toBe(false);
     }
   );
 });

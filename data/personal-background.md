@@ -15,19 +15,19 @@ This note stores grounded personal background facts for Wizard, Shubham Shah's A
 
 ## Scaler School Of Technology
 
-Shubham is currently in his second year of college at Scaler School of Technology.
+Shubham is currently in his third year of college at Scaler School of Technology.
 
 Scaler School of Technology was not originally his only plan. It started as one of his backup options, but after joining, he felt that choosing Scaler was a very good decision.
 
-The main reason is Scaler's industry-oriented curriculum. Shubham values that Scaler teaches computer science from day one and keeps the learning highly practical. Most of his college work happens on a laptop, including exams. He has barely needed pen-and-paper study for the last 1.5 years, because coursework, building, practice, and assessments are laptop-first.
+The main reason is Scaler's industry-oriented curriculum. Shubham values that Scaler teaches computer science from day one and keeps the learning highly practical. Most of his college work happens on a laptop, including exams. He has barely needed pen-and-paper study since starting college, because coursework, building, practice, and assessments are laptop-first.
 
-Shubham feels this curriculum helped him start building serious software and AI projects early in college. When he talks to friends about the things he is able to build in his second year, they are often surprised by the amount and quality of work he is doing at this age.
+Shubham feels this curriculum helped him start building serious software and AI projects early in college. When he talks to friends about the things he has built in college, they are often surprised by the amount and quality of work he is doing at this age.
 
 ## Degree And Academic Structure
 
 Scaler School of Technology does not directly provide Shubham's formal degree. Scaler has a collaboration with BITS Pilani, so Shubham also has to complete BITS Pilani Digital coursework, assignments, and semester exams.
 
-Through this collaboration, Shubham is pursuing a B.Sc. in Computer Science from BITS Pilani Digital.
+Through this collaboration, Shubham is pursuing a B.Sc. in Computer Science Engineering from BITS Pilani Digital. Through Scaler School of Technology, he is also pursuing an M.Sc. from Woolf University.
 
 This means Shubham handles two parallel academic tracks:
 
@@ -35,8 +35,7 @@ This means Shubham handles two parallel academic tracks:
 - BITS Pilani Digital for the formal degree requirements, assignments, and semester examinations.
 
 Each semester, Shubham receives a CGPA for the BITS Pilani Digital degree track and a CGR for the Scaler School of Technology track.
-his current BITS cgpa or cgr is 9.6
-and SST(Scaler School of Technology) CGPA/ CGR is 8.0
+
 ## Hobbies And Fitness
 
 - Shubham likes playing badminton & chess.
@@ -49,4 +48,5 @@ and SST(Scaler School of Technology) CGPA/ CGR is 8.0
 - Use these facts only when relevant to questions about Shubham's background, education, age, college life, hobbies, motivation, discipline, or personal interests.
 - Do not overstate the facts or turn them into exaggerated achievements.
 - When discussing Scaler School of Technology, frame the story honestly: it was initially a backup option, but it became a decision Shubham is genuinely happy with because of the practical, industry-oriented curriculum.
-- When discussing Shubham's degree, clarify that the formal degree track is through BITS Pilani Digital, while Scaler School of Technology provides the practical curriculum experience.
+- When discussing Shubham's degree, clarify that the formal B.Sc. track is through BITS Pilani Digital, while Scaler School of Technology provides the practical curriculum and the M.Sc. from Woolf University.
+- Do not share Shubham's CGPA, CGR, or other college grades. He prefers to discuss them directly, for example on a call.
