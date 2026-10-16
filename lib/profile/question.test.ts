@@ -3,6 +3,7 @@ import {
   isProfileOverviewQuestion,
   isProjectListQuestion,
   isProjectQuestion,
+  isRecentWorkQuestion,
   isWizardProjectQuestion,
   normalizeProfileQuestion
 } from "@/lib/profile/question";
@@ -48,4 +49,23 @@ describe("question classifiers", () => {
     expect(isProfileOverviewQuestion("Who is he?")).toBe(true);
     expect(isProfileOverviewQuestion("Tell me about CommentAI")).toBe(false);
   });
+});
+
+describe("isRecentWorkQuestion", () => {
+  it.each([
+    "What are his recent projects?",
+    "What has Shubham built lately?",
+    "What is he working on right now?",
+    "What are the latest repos on his GitHub?",
+    "What has he been up to recently?"
+  ])("treats %j as a question about recent work", (question) => {
+    expect(isRecentWorkQuestion(question)).toBe(true);
+  });
+
+  it.each(["What's his latest CGPA?", "What projects has he done?", "Is he available right now?"])(
+    "leaves %j to the normal path",
+    (question) => {
+      expect(isRecentWorkQuestion(question)).toBe(false);
+    }
+  );
 });
