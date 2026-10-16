@@ -14,7 +14,7 @@ export function isProjectQuestion(question: string) {
 const RECENCY =
   /\b(?:recent(?:ly)?|latest|lately|newest|nowadays|these days|right now|currently|this (?:month|year))\b/i;
 const WORK =
-  /\b(?:projects?|repos?|repositories|github|built|build(?:ing)?|shipped|made|making|up to)\b/i;
+  /\b(?:work|projects?|repos?|repositories|github|built|build(?:ing)?|shipped|made|making|up to)\b/i;
 
 export function isRecentWorkQuestion(question: string) {
   return /\bworking on\b/i.test(question) || (RECENCY.test(question) && WORK.test(question));

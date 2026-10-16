@@ -57,7 +57,9 @@ describe("isRecentWorkQuestion", () => {
     "What has Shubham built lately?",
     "What is he working on right now?",
     "What are the latest repos on his GitHub?",
-    "What has he been up to recently?"
+    "What has he been up to recently?",
+    "his most recent work?",
+    "Is Sentinel Shubham's most recent work?"
   ])("treats %j as a question about recent work", (question) => {
     expect(isRecentWorkQuestion(question)).toBe(true);
   });
