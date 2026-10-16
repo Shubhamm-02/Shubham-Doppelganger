@@ -1,4 +1,5 @@
-import { chatModel, getOpenAIClient } from "@/lib/llm/client";
+import { reasoningParams } from "@/lib/llm/client";
+import { withChatProviderFallback } from "@/lib/llm/fallback";
 import {
   answerInstructions,
   CONTEXT_HEADING,
@@ -76,26 +77,32 @@ export async function streamGroundedAnswer(input: GroundedAnswerInput) {
   let answer = "";
 
   try {
-    const stream = await getOpenAIClient().chat.completions.create(
-      {
-        model: chatModel(),
-        messages: [
-          { role: "system", content: PERSONA_SYSTEM_PROMPT },
-          { role: "user", content: userPrompt(input) }
-        ],
-        temperature: TEMPERATURE[input.style],
-        stream: true
-      },
-      { signal }
-    );
+    await withChatProviderFallback(
+      async (provider) => {
+        const stream = await provider.client.chat.completions.create(
+          {
+            model: provider.chat.id,
+            ...reasoningParams(provider.chat),
+            messages: [
+              { role: "system", content: PERSONA_SYSTEM_PROMPT },
+              { role: "user", content: userPrompt(input) }
+            ],
+            temperature: TEMPERATURE[input.style],
+            stream: true
+          },
+          { signal }
+        );
 
-    for await (const chunk of stream) {
-      if (signal?.aborted) break;
-      const token = chunk.choices[0]?.delta?.content ?? "";
-      if (!token) continue;
-      answer += token;
-      await onToken(token);
-    }
+        for await (const chunk of stream) {
+          if (signal?.aborted) break;
+          const token = chunk.choices[0]?.delta?.content ?? "";
+          if (!token) continue;
+          answer += token;
+          await onToken(token);
+        }
+      },
+      { signal, canFallBack: () => answer.length === 0 }
+    );
   } catch (error) {
     if (!signal?.aborted) throw error;
   }
