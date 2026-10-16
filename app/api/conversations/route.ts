@@ -1,42 +1,37 @@
 import { NextResponse } from "next/server";
-import { getSupabaseAdmin, hasSupabaseConfig } from "@/lib/supabase";
+import { jsonError, parseOptionalPositiveInt, parsePositiveInt } from "@/lib/http";
+import { getChatStore } from "@/lib/store";
+import { getVisitor } from "@/lib/visitor";
 
 export const runtime = "nodejs";
 
+const DEFAULT_TURN_LIMIT = 20;
+
 export async function GET(request: Request) {
-  if (!hasSupabaseConfig()) {
-    return NextResponse.json({ conversations: [] });
+  const params = new URL(request.url).searchParams;
+  const sessionId = parsePositiveInt(params.get("sessionId"));
+  const before = parseOptionalPositiveInt(params.get("before"));
+  const limit = parseOptionalPositiveInt(params.get("limit"));
+
+  if (sessionId === null) {
+    return jsonError(400, "invalid_request", "sessionId must be a positive integer.");
   }
 
-  const url = new URL(request.url);
-  const limit = Math.min(Number(url.searchParams.get("limit") ?? "10") || 10, 30);
-  const channel = (url.searchParams.get("channel") ?? "chat").toLowerCase();
-  const sessionIdRaw = url.searchParams.get("sessionId");
-  const sessionId = sessionIdRaw ? Number(sessionIdRaw) : null;
-
-  const supabase = getSupabaseAdmin();
-  let query = supabase
-    .from("conversations")
-    .select(
-      "id,session_id,channel,user_message,assistant_message,grounded,latency_ms,created_at"
-    )
-    .eq("channel", channel)
-    .order("created_at", { ascending: false });
-
-  if (sessionId && Number.isFinite(sessionId)) {
-    query = query.eq("session_id", sessionId);
+  if (before === null || limit === null) {
+    return jsonError(400, "invalid_request", "before and limit must be positive integers.");
   }
 
   try {
-    const { data, error } = await query.limit(limit);
+    const visitor = await getVisitor();
+    const page = await getChatStore()?.listTurns(visitor.id, sessionId, {
+      before,
+      limit: limit ?? DEFAULT_TURN_LIMIT
+    });
 
-    if (error) {
-      return NextResponse.json({ error: error.message, conversations: [] });
-    }
-
-    return NextResponse.json({ conversations: data ?? [] });
+    if (!page) return jsonError(404, "not_found", "Chat session not found.");
+    return NextResponse.json(page);
   } catch (error) {
-    console.warn("Conversation history unavailable.", error);
-    return NextResponse.json({ conversations: [] });
+    console.error("Chat history request failed.", error);
+    return jsonError(503, "unavailable", "Chat history is temporarily unavailable.");
   }
 }

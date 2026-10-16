@@ -1,6 +1,6 @@
 import { loadEnvConfig } from "@next/env";
 import { DAY_ONE_EVAL_CASES } from "../lib/evals";
-import { answerProfileQuestion } from "../lib/rag";
+import { answerProfileQuestion } from "../lib/profile/answer";
 
 loadEnvConfig(process.cwd());
 
@@ -10,7 +10,7 @@ async function main() {
     console.log(`\n[${evalCase.id}] ${evalCase.question}`);
     console.log(`Expected: ${evalCase.expectedBehavior}`);
     console.log(`Grounded: ${result.grounded}`);
-    console.log(`Citations: ${result.citations.join(", ") || "none"}`);
+    console.log(`Sources: ${result.sources.map((source) => source.id).join(", ") || "none"}`);
     console.log(result.answer);
   }
 }

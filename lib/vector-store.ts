@@ -1,49 +1,21 @@
-import { getEmbeddingModel } from "@/lib/openai-client";
-import { getSupabaseAdmin, hasSupabaseConfig } from "@/lib/supabase";
 import type { DocumentChunk } from "@/lib/chunking";
+import { embeddingModel } from "@/lib/llm/client";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
-export type RetrievedDocument = {
-  id: number;
-  source_type: string;
-  source_name: string;
-  source_path: string;
-  source_url: string | null;
-  chunk_index: number;
-  content: string;
-  metadata: Record<string, unknown>;
-  similarity: number;
-};
+type StoredChunk = { id: number; source_path: string; chunk_index: number };
 
-type ConversationLog = {
-  channel: "chat" | "voice" | "eval";
-  sessionId?: number;
-  userMessage: string;
-  assistantMessage: string;
-  retrievedDocumentIds: number[];
-  grounded: boolean;
-  latencyMs: number;
-};
-
-export type ConversationTurn = {
-  id: number;
-  session_id: number | null;
-  channel: string;
-  user_message: string;
-  assistant_message: string | null;
-  grounded: boolean | null;
-  latency_ms: number | null;
-  created_at: string;
-};
+const UPSERT_BATCH_SIZE = 100;
+const PAGE_SIZE = 1000;
+const DELETE_BATCH_SIZE = 200;
 
 export async function upsertDocumentChunks(
   chunks: Array<DocumentChunk & { embedding: number[] }>
 ) {
   const supabase = getSupabaseAdmin();
-  const embeddingModel = getEmbeddingModel();
-  const batchSize = 100;
+  const model = embeddingModel();
 
-  for (let index = 0; index < chunks.length; index += batchSize) {
-    const batch = chunks.slice(index, index + batchSize).map((chunk) => ({
+  for (let index = 0; index < chunks.length; index += UPSERT_BATCH_SIZE) {
+    const batch = chunks.slice(index, index + UPSERT_BATCH_SIZE).map((chunk) => ({
       source_type: chunk.sourceType,
       source_name: chunk.sourceName,
       source_path: chunk.sourcePath,
@@ -51,7 +23,7 @@ export async function upsertDocumentChunks(
       chunk_index: chunk.chunkIndex,
       content: chunk.content,
       content_hash: chunk.contentHash,
-      embedding_model: embeddingModel,
+      embedding_model: model,
       metadata: chunk.metadata,
       embedding: chunk.embedding
     }));
@@ -64,62 +36,46 @@ export async function upsertDocumentChunks(
   }
 }
 
-export async function matchDocuments(
-  queryEmbedding: number[],
-  options: { matchCount?: number; threshold?: number } = {}
-) {
+async function listStoredChunks() {
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase.rpc("match_documents", {
-    query_embedding: queryEmbedding,
-    match_count: options.matchCount ?? 6,
-    match_threshold: options.threshold ?? 0.18
-  });
+  const rows: StoredChunk[] = [];
 
-  if (error) throw error;
-  return (data ?? []) as RetrievedDocument[];
-}
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("documents")
+      .select("id,source_path,chunk_index")
+      .order("id")
+      .range(from, from + PAGE_SIZE - 1);
 
-export async function logConversation(log: ConversationLog) {
-  const supabase = getSupabaseAdmin();
-  const { error } = await supabase.from("conversations").insert({
-    session_id: log.sessionId ?? null,
-    channel: log.channel,
-    user_message: log.userMessage,
-    assistant_message: log.assistantMessage,
-    retrieved_document_ids: log.retrievedDocumentIds,
-    grounded: log.grounded,
-    latency_ms: log.latencyMs
-  });
-
-  if (error) {
-    console.warn("Failed to log conversation", error.message);
+    if (error) throw error;
+    rows.push(...((data ?? []) as StoredChunk[]));
+    if (!data || data.length < PAGE_SIZE) return rows;
   }
 }
 
-export async function tryLogConversation(log: ConversationLog) {
-  if (!hasSupabaseConfig()) return;
-  try {
-    await logConversation(log);
-  } catch (error) {
-    console.warn("Failed to log conversation", error);
-  }
-}
-
-export async function listRecentConversationTurns(
-  sessionId: number,
-  limit = 8
+// `keep` must be the full local chunk set: rows for missing paths, and trailing chunks of
+// documents that got shorter, are deleted.
+export async function pruneDocumentsExcept(
+  keep: Array<Pick<DocumentChunk, "sourcePath" | "chunkIndex">>
 ) {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("conversations")
-    .select(
-      "id,session_id,channel,user_message,assistant_message,grounded,latency_ms,created_at"
-    )
-    .eq("channel", "chat")
-    .eq("session_id", sessionId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  const chunkCounts = new Map<string, number>();
+  for (const chunk of keep) {
+    chunkCounts.set(
+      chunk.sourcePath,
+      Math.max(chunkCounts.get(chunk.sourcePath) ?? 0, chunk.chunkIndex + 1)
+    );
+  }
 
-  if (error) throw error;
-  return (data ?? []) as ConversationTurn[];
+  const staleRows = (await listStoredChunks()).filter(
+    (row) => row.chunk_index >= (chunkCounts.get(row.source_path) ?? 0)
+  );
+  const supabase = getSupabaseAdmin();
+
+  for (let index = 0; index < staleRows.length; index += DELETE_BATCH_SIZE) {
+    const ids = staleRows.slice(index, index + DELETE_BATCH_SIZE).map((row) => row.id);
+    const { error } = await supabase.from("documents").delete().in("id", ids);
+    if (error) throw error;
+  }
+
+  return staleRows.length;
 }

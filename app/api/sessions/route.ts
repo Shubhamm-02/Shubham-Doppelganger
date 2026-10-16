@@ -1,82 +1,28 @@
 import { NextResponse } from "next/server";
-import { hasSupabaseConfig } from "@/lib/supabase";
-import {
-  createChatSession,
-  deleteChatSession,
-  listChatSessions
-} from "@/lib/sessions";
+import { jsonError, parseOptionalPositiveInt } from "@/lib/http";
+import { getChatStore } from "@/lib/store";
+import { getVisitor } from "@/lib/visitor";
 
 export const runtime = "nodejs";
 
+const DEFAULT_SESSION_LIMIT = 30;
+
 export async function GET(request: Request) {
-  if (!hasSupabaseConfig()) {
-    return NextResponse.json({ sessions: [] });
+  const limit = parseOptionalPositiveInt(new URL(request.url).searchParams.get("limit"));
+
+  if (limit === null) {
+    return jsonError(400, "invalid_request", "limit must be a positive integer.");
   }
 
-  const url = new URL(request.url);
-  const limit = Math.min(Number(url.searchParams.get("limit") ?? "12") || 12, 40);
-
   try {
-    const sessions = await listChatSessions(limit);
+    const visitor = await getVisitor();
+    const store = getChatStore();
+    if (!store) return NextResponse.json({ sessions: [] });
+
+    const sessions = await store.listSessions(visitor.id, limit ?? DEFAULT_SESSION_LIMIT);
     return NextResponse.json({ sessions });
   } catch (error) {
-    console.warn("Chat sessions unavailable.", error);
-    return NextResponse.json({ sessions: [] });
-  }
-}
-
-export async function POST(request: Request) {
-  if (!hasSupabaseConfig()) {
-    return NextResponse.json(
-      { error: "Supabase is not configured." },
-      { status: 400 }
-    );
-  }
-
-  const body = await request.json().catch(() => ({}));
-  const title =
-    typeof body?.title === "string" && body.title.trim()
-      ? body.title.trim()
-      : "New chat";
-
-  try {
-    const session = await createChatSession(title);
-    return NextResponse.json({ session });
-  } catch (error) {
-    console.warn("Chat session creation failed.", error);
-    return NextResponse.json(
-      { error: "Chat sessions are temporarily unavailable." },
-      { status: 503 }
-    );
-  }
-}
-
-export async function DELETE(request: Request) {
-  if (!hasSupabaseConfig()) {
-    return NextResponse.json(
-      { error: "Supabase is not configured." },
-      { status: 400 }
-    );
-  }
-
-  const url = new URL(request.url);
-  const sessionId = Number(url.searchParams.get("id"));
-
-  if (!Number.isFinite(sessionId) || sessionId <= 0) {
-    return NextResponse.json(
-      { error: "Valid session id is required." },
-      { status: 400 }
-    );
-  }
-
-  try {
-    await deleteChatSession(sessionId);
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.warn("Chat session deletion failed.", error);
-    return NextResponse.json(
-      { error: "Chat sessions are temporarily unavailable." },
-      { status: 503 }
-    );
+    console.error("Chat sessions request failed.", error);
+    return jsonError(503, "unavailable", "Chat history is temporarily unavailable.");
   }
 }

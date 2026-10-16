@@ -29,7 +29,3 @@ export function findKnownCallerName(value: string) {
   const normalized = normalizeName(value);
   return KNOWN_CALLER_NAME_MAP.get(normalized);
 }
-
-export function isKnownCallerName(value: string) {
-  return Boolean(findKnownCallerName(value));
-}
