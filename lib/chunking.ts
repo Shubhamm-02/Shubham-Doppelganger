@@ -25,6 +25,7 @@ type MarkdownSection = {
 };
 
 const MAX_CHUNK_CHARS = 2400;
+const HEADING = /^(#{1,3})\s+(.+)$/;
 
 function hashContent(content: string) {
   return createHash("sha256").update(content).digest("hex");
@@ -41,16 +42,27 @@ function extractSourceUrl(content: string) {
   return firstUrl?.[0] ?? null;
 }
 
+function closesFence(line: string, openFence: string) {
+  const marker = line.trim();
+  return (
+    /^(`{3,}|~{3,})$/.test(marker) &&
+    marker[0] === openFence[0] &&
+    marker.length >= openFence.length
+  );
+}
+
 function splitMarkdownIntoSections(source: ProfileSource): MarkdownSection[] {
   const sections: MarkdownSection[] = [];
   const lines = source.content.split("\n");
   let currentTitle = source.title;
   let currentLines: string[] = [];
   let sectionIndex = 0;
+  let openFence: string | null = null;
 
   function flush() {
     const content = currentLines.join("\n").trim();
-    if (!content) return;
+    // A heading straight above another one (a note's title over its first section) has nothing to retrieve.
+    if (!content || HEADING.test(content)) return;
 
     sections.push({
       title: currentTitle,
@@ -61,7 +73,13 @@ function splitMarkdownIntoSections(source: ProfileSource): MarkdownSection[] {
   }
 
   for (const line of lines) {
-    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (openFence) {
+      if (closesFence(line, openFence)) openFence = null;
+    } else {
+      openFence = line.match(/^\s*(`{3,}|~{3,})/)?.[1] ?? null;
+    }
+
+    const heading = openFence ? null : line.match(HEADING);
     if (heading) {
       flush();
       currentTitle = heading[2].trim();

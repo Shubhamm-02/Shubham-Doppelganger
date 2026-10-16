@@ -2,10 +2,13 @@ node_modules
 .next
 out
 dist
+.vercel
 .env
 .env.local
 .env.*.local
 *.log
 coverage
+evals/results
 .DS_Store
 docs/evals-report.md
+*.tsbuildinfo

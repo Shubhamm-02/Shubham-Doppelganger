@@ -56,10 +56,17 @@ function requireEnv(name: string) {
   return value;
 }
 
-function toolServer(url: string) {
+type ToolServer = {
+  url: string;
+  timeoutSeconds: number;
+  headers: Record<string, string>;
+};
+
+function toolServer(url: string, secret: string): ToolServer {
   return {
     url,
-    timeoutSeconds: 12
+    timeoutSeconds: 12,
+    headers: { "x-vapi-secret": secret }
   };
 }
 
@@ -117,7 +124,7 @@ function tuneVoiceConfig(voice: Record<string, unknown>) {
 }
 
 function functionTool(
-  url: string,
+  server: ToolServer,
   name: string,
   description: string,
   properties: Record<string, unknown>,
@@ -126,7 +133,7 @@ function functionTool(
   return {
     type: "function",
     async: false,
-    server: toolServer(url),
+    server,
     function: {
       name,
       description,
@@ -140,10 +147,10 @@ function functionTool(
   };
 }
 
-function buildTools(url: string) {
+function buildTools(server: ToolServer) {
   return [
     functionTool(
-      url,
+      server,
       "search_profile",
       "Search Shubham Shah's verified profile. Use for all questions about projects, skills, experience, internships, education, links, personal background, age, hobbies, college background, broad summaries, introductions, or vague profile prompts like who is he or tell me about him. Treat speech-to-text variants like Shivam, Shubim, Shubhamshah, Chebo, Chibham, or similar names as Shubham Shah.",
       {
@@ -156,7 +163,7 @@ function buildTools(url: string) {
       ["question"]
     ),
     functionTool(
-      url,
+      server,
       "get_availability",
       "Check 15-minute interview availability for Shubham after the user gives a preferred India-time day/date.",
       {
@@ -169,7 +176,7 @@ function buildTools(url: string) {
       ["preferredWindow"]
     ),
     functionTool(
-      url,
+      server,
       "book_interview",
       "Book a selected 15-minute interview slot only after a slotStart from get_availability, name, email, and explicit email confirmation are present.",
       {
@@ -238,6 +245,7 @@ async function main() {
     process.env.VAPI_ASSISTANT_ID?.trim() ||
     process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID?.trim();
   const toolsUrl = requireEnv("VAPI_TOOLS_URL");
+  const webhookSecret = requireEnv("VAPI_WEBHOOK_SECRET");
 
   if (!assistantId) {
     throw new Error(
@@ -321,7 +329,7 @@ async function main() {
           content: SYSTEM_PROMPT
         }
       ],
-      tools: buildTools(toolsUrl)
+      tools: buildTools(toolServer(toolsUrl, webhookSecret))
     }
   };
 

@@ -1,5 +1,6 @@
-import { ChatShell } from "@/components/ChatShell";
+import { ChatApp } from "@/components/chat-app";
+import { getProfileSummary } from "@/lib/profile-summary";
 
 export default function Home() {
-  return <ChatShell />;
+  return <ChatApp profile={getProfileSummary()} />;
 }

@@ -1,12 +1,9 @@
 import { loadEnvConfig } from "@next/env";
 import { buildProfileChunks } from "../lib/chunking";
-import {
-  embedTexts,
-  getExpectedEmbeddingDimensions,
-  hasOpenAIConfig
-} from "../lib/openai-client";
+import { expectedEmbeddingDimensions, hasOpenAIConfig } from "../lib/llm/client";
+import { embedTexts } from "../lib/llm/embeddings";
 import { hasSupabaseConfig } from "../lib/supabase";
-import { upsertDocumentChunks } from "../lib/vector-store";
+import { pruneDocumentsExcept, upsertDocumentChunks } from "../lib/vector-store";
 
 loadEnvConfig(process.cwd());
 
@@ -37,7 +34,7 @@ async function main() {
 
   console.log(`\nEmbedding ${chunks.length} chunks...`);
   const embeddings = await embedTexts(chunks.map((chunk) => chunk.content));
-  const expectedDimensions = getExpectedEmbeddingDimensions();
+  const expectedDimensions = expectedEmbeddingDimensions();
   const actualDimensions = embeddings[0]?.length;
 
   if (actualDimensions !== expectedDimensions) {
@@ -53,7 +50,10 @@ async function main() {
 
   console.log("Uploading chunks to Supabase...");
   await upsertDocumentChunks(embeddedChunks);
-  console.log(`Done. Upserted ${embeddedChunks.length} chunks.`);
+  const prunedCount = await pruneDocumentsExcept(chunks);
+  console.log(
+    `Done. Upserted ${embeddedChunks.length} chunks and pruned ${prunedCount} stale chunks.`
+  );
 }
 
 main().catch((error) => {

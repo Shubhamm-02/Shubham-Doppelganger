@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { bookInterview, getAvailability } from "@/lib/calendar";
-import { answerVoiceProfileQuestion } from "@/lib/rag";
+import { bookInterview, getAvailability } from "@/lib/calendar/voice-tools";
+import { jsonError } from "@/lib/http";
+import { answerVoiceProfileQuestion } from "@/lib/profile/answer";
+import { safeEqual } from "@/lib/secure-compare";
 
 export const runtime = "nodejs";
 
@@ -112,6 +114,16 @@ async function runTool(toolCall: ToolCall) {
 }
 
 export async function POST(request: Request) {
+  const secret = process.env.VAPI_WEBHOOK_SECRET?.trim();
+  if (!secret) {
+    console.error("VAPI_WEBHOOK_SECRET is not set; rejecting Vapi tool calls.");
+    return jsonError(503, "unavailable", "Voice tools are not configured.");
+  }
+
+  if (!safeEqual(request.headers.get("x-vapi-secret") ?? "", secret)) {
+    return jsonError(401, "unauthorized", "Missing or invalid x-vapi-secret.");
+  }
+
   const body = (await request.json().catch(() => ({}))) as Record<
     string,
     unknown
@@ -119,12 +131,10 @@ export async function POST(request: Request) {
   const toolCalls = extractToolCalls(body);
 
   if (!toolCalls.length) {
-    return NextResponse.json(
-      {
-        error:
-          "No tool call found. Expected a Vapi tool-calls payload or a direct toolCall."
-      },
-      { status: 400 }
+    return jsonError(
+      400,
+      "invalid_request",
+      "No tool call found. Expected a Vapi tool-calls payload or a direct toolCall."
     );
   }
 
