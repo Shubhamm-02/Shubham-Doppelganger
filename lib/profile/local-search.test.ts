@@ -38,6 +38,14 @@ describe("searchLocalChunks", () => {
     expect(sections.some((section) => section.endsWith(":: What It Does"))).toBe(false);
   });
 
+  it("keeps placeholder sections out of the top results", () => {
+    const sections = searchLocalChunks("What's the most complex system he's built end to end?")
+      .slice(0, 4)
+      .map((chunk) => chunk.section);
+
+    expect(sections).not.toContain("Extra Details To Add Later");
+  });
+
   it("returns chunks sorted by descending score", () => {
     const scores = searchLocalChunks("What role does FAISS play in the CCPA project?").map(
       (chunk) => chunk.score

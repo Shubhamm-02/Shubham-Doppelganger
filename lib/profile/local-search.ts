@@ -179,7 +179,11 @@ function scoreChunk(
       : 0;
   const sectionTokens = new Set(tokenize(sectionTitle));
   const sectionBoost = queryTokens.some((token) => sectionTokens.has(token)) ? 2 : 0;
-  const boilerplatePenalty = /questions this note can answer/i.test(sectionTitle) ? 4 : 0;
+  const boilerplatePenalty = /^(?:questions this note can answer|extra details to add later)$/i.test(
+    sectionTitle
+  )
+    ? 4
+    : 0;
   const projectNoteBias = isProjectKind(chunk.sourceType) ? (wantsProjects ? 4 : 0.5) : 0;
   const resumeProjectPenalty =
     wantsProjects &&
