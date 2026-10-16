@@ -14,7 +14,9 @@ describe("searchLocalChunks", () => {
     ["How does the agent loop in CLI-Agent work?", "data/project-notes/cli-agent.md"],
     ["What are Shubham's hobbies?", "data/personal-background.md"],
     ["What did Shubham build at CommentAI?", "data/project-notes/comment-ai.md"],
-    ["What are Shubham Shah's skills?", "data/resume.md"]
+    ["What are Shubham Shah's skills?", "data/resume.md"],
+    ["Where does Shubham study?", "data/personal-background.md"],
+    ["What backend work has he done outside of AI?", "data/resume.md"]
   ])("ranks the right note first for %j", (question, path) => {
     const [top] = searchLocalChunks(question);
 
@@ -25,6 +27,15 @@ describe("searchLocalChunks", () => {
     expect(searchLocalChunks("What anti-spam guardrails are in CommentAI?")[0].section).toBe(
       "Anti-Spam Guardrails"
     );
+  });
+
+  it("matches inflected words and ignores filler like \"does\"", () => {
+    const sections = searchLocalChunks("Where is he studying, and how are his grades?")
+      .slice(0, 4)
+      .map((chunk) => `${chunk.path} :: ${chunk.section}`);
+
+    expect(sections).toContain("data/resume.md :: Education");
+    expect(sections.some((section) => section.endsWith(":: What It Does"))).toBe(false);
   });
 
   it("returns chunks sorted by descending score", () => {

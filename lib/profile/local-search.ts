@@ -12,9 +12,20 @@ const STOP_WORDS = new Set([
   "as",
   "at",
   "be",
+  "about",
+  "any",
   "by",
+  "can",
+  "could",
+  "did",
+  "does",
+  "done",
   "for",
   "from",
+  "had",
+  "has",
+  "have",
+  "him",
   "his",
   "how",
   "i",
@@ -25,31 +36,49 @@ const STOP_WORDS = new Set([
   "of",
   "on",
   "or",
+  "she",
   // Every source is about Shubham, so his name never tells one from another.
   "shah",
   "shubham",
+  "tell",
   "that",
   "the",
+  "their",
+  "they",
   "this",
   "to",
+  "was",
+  "were",
   "what",
   "when",
   "where",
+  "which",
   "who",
   "why",
+  "will",
   "with",
+  "work",
+  "would",
   "you",
   "your"
 ]);
 
+const EDUCATION_TERMS = ["education", "degree", "college", "scaler", "bits", "pilani", "cgpa"];
+
+// Keys and values are stems (see `stem`), so "studying" and "grades" find them too.
 const QUERY_SYNONYMS: Record<string, string[]> = {
-  age: ["born", "birth", "birthday", "old", "years"],
-  born: ["birth", "birthday", "age", "old", "years"],
+  age: ["born", "birth", "birthday", "old", "year"],
+  born: ["birth", "birthday", "age", "old", "year"],
   birthday: ["born", "birth", "age"],
   degree: ["bits", "pilani", "bsc", "computer", "science"],
   college: ["scaler", "school", "technology", "bits", "pilani"],
-  hobbies: ["badminton", "gym", "fitness", "chess"],
-  hobby: ["badminton", "gym", "fitness", "chess"]
+  study: EDUCATION_TERMS,
+  student: EDUCATION_TERMS,
+  university: EDUCATION_TERMS,
+  grade: ["cgpa", "education", "score", "academic"],
+  cgpa: ["grade", "education", "academic"],
+  hobby: ["badminton", "gym", "fitness", "chess"],
+  backend: ["api", "server", "spring", "boot", "database", "payment", "razorpay"]
 };
 
 const KNOWN_PROJECT_NAMES = [
@@ -82,12 +111,28 @@ function compactName(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
+// Crude suffix stripping, applied to questions and sources alike so both sides meet.
+function stem(token: string) {
+  if (token.length > 4 && token.endsWith("ies")) return `${token.slice(0, -3)}y`;
+  if (token.length > 4 && token.endsWith("ied")) return `${token.slice(0, -3)}y`;
+  if (token.length > 5 && token.endsWith("ing")) {
+    const base = token.slice(0, -3);
+    return /([b-df-hj-np-tv-z])\1$/.test(base) ? base.slice(0, -1) : base;
+  }
+  if (token.length > 4 && token.endsWith("ed") && !token.endsWith("eed")) return token.slice(0, -2);
+  if (token.length > 3 && token.endsWith("s") && !/(?:ss|us|is)$/.test(token)) {
+    return token.slice(0, -1);
+  }
+  return token;
+}
+
 function tokenize(value: string) {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9+#.]+/g, " ")
     .split(/\s+/)
-    .filter((token) => token.length > 2 && !STOP_WORDS.has(token));
+    .filter((token) => token.length > 2 && !STOP_WORDS.has(token))
+    .map(stem);
 }
 
 function expandQueryTokens(tokens: string[]) {
@@ -118,18 +163,22 @@ function toRetrievedChunk(chunk: DocumentChunk, score: number): RetrievedChunk {
   };
 }
 
-function scoreChunk(chunk: DocumentChunk, queryTokens: string[], wantsProjects: boolean) {
+function scoreChunk(
+  chunk: DocumentChunk,
+  queryTokens: string[],
+  questionTokens: string[],
+  wantsProjects: boolean
+) {
   const contentTokens = new Set(tokenize(chunk.content));
   const overlap = queryTokens.filter((token) => contentTokens.has(token)).length;
   const sectionTitle = chunk.metadata.sectionTitle;
   const titleBoost =
     chunk.sourceType !== "resume" &&
-    queryTokens.some((token) => compactName(chunk.sourceName).includes(compactName(token)))
+    questionTokens.some((token) => compactName(chunk.sourceName).includes(compactName(token)))
       ? 3
       : 0;
-  const sectionBoost = queryTokens.some((token) => sectionTitle.toLowerCase().includes(token))
-    ? 2
-    : 0;
+  const sectionTokens = new Set(tokenize(sectionTitle));
+  const sectionBoost = queryTokens.some((token) => sectionTokens.has(token)) ? 2 : 0;
   const boilerplatePenalty = /questions this note can answer/i.test(sectionTitle) ? 4 : 0;
   const projectNoteBias = isProjectKind(chunk.sourceType) ? (wantsProjects ? 4 : 0.5) : 0;
   const resumeProjectPenalty =
@@ -156,12 +205,15 @@ function scoreChunk(chunk: DocumentChunk, queryTokens: string[], wantsProjects: 
 }
 
 export function searchLocalChunks(question: string): RetrievedChunk[] {
-  const queryTokens = expandQueryTokens(tokenize(question));
+  const questionTokens = tokenize(question);
+  const queryTokens = expandQueryTokens(questionTokens);
   if (!queryTokens.length) return [];
   const wantsProjects = isProjectQuestion(question);
 
   return allChunks()
-    .map((chunk) => toRetrievedChunk(chunk, scoreChunk(chunk, queryTokens, wantsProjects)))
+    .map((chunk) =>
+      toRetrievedChunk(chunk, scoreChunk(chunk, queryTokens, questionTokens, wantsProjects))
+    )
     .filter((chunk) => chunk.score > 0)
     .sort((a, b) => b.score - a.score);
 }
@@ -174,6 +226,12 @@ export function profileOverviewChunks(): RetrievedChunk[] {
         PROFILE_OVERVIEW_SECTIONS.has(chunk.metadata.sectionTitle)
     )
     .map((chunk, index) => toRetrievedChunk(chunk, 10 - index * 0.2));
+}
+
+export function githubChunks(): RetrievedChunk[] {
+  return allChunks()
+    .filter((chunk) => chunk.sourceType === "github")
+    .map((chunk) => toRetrievedChunk(chunk, 0));
 }
 
 export function wizardProjectChunks(): RetrievedChunk[] {

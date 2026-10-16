@@ -8,14 +8,16 @@ import {
 } from "@/lib/llm/grounded-answer";
 import type { AnswerStyle } from "@/lib/llm/prompts";
 import {
+  githubChunks,
   profileOverviewChunks,
   searchLocalChunks,
   wizardProjectChunks
 } from "@/lib/profile/local-search";
-import { projectDigest } from "@/lib/profile/project-digest";
+import { projectDigest, recentRepos, recentWorkDigest } from "@/lib/profile/project-digest";
 import {
   isProfileOverviewQuestion,
   isProjectListQuestion,
+  isRecentWorkQuestion,
   isWizardProjectQuestion,
   normalizeProfileQuestion
 } from "@/lib/profile/question";
@@ -112,8 +114,13 @@ export async function streamProfileAnswer(
 ): Promise<ProfileAnswer> {
   const normalizedQuestion = normalizeProfileQuestion(question);
 
-  if (!isWizardProjectQuestion(normalizedQuestion) && isProjectListQuestion(normalizedQuestion)) {
-    const digest = projectDigest(searchLocalChunks(normalizedQuestion));
+  if (!isWizardProjectQuestion(normalizedQuestion)) {
+    const repos = recentRepos(githubChunks());
+    const digest = isRecentWorkQuestion(normalizedQuestion)
+      ? recentWorkDigest(repos)
+      : isProjectListQuestion(normalizedQuestion)
+        ? projectDigest(searchLocalChunks(normalizedQuestion), repos)
+        : null;
     if (digest) {
       return deliver(
         {
