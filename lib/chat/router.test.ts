@@ -7,15 +7,25 @@ import {
 } from "@/lib/chat/router";
 import type { SchedulingStep } from "@/lib/chat/types";
 
-const { parse, hasOpenAIConfig } = vi.hoisted(() => ({
+const { parse, groqParse, providerNames } = vi.hoisted(() => ({
   parse: vi.fn(),
-  hasOpenAIConfig: vi.fn(() => false)
+  groqParse: vi.fn(),
+  providerNames: { current: [] as Array<"openai" | "groq"> }
 }));
 
-vi.mock("@/lib/llm/client", () => ({
-  getOpenAIClient: () => ({ chat: { completions: { parse } } }),
-  hasOpenAIConfig,
-  routerModel: () => "router-test-model"
+vi.mock("@/lib/llm/client", async (importOriginal) => ({
+  reasoningParams: (await importOriginal<typeof import("@/lib/llm/client")>()).reasoningParams,
+  hasChatProvider: () => providerNames.current.length > 0,
+  chatProviders: () =>
+    providerNames.current.map((name) => ({
+      name,
+      client: { chat: { completions: { parse: name === "openai" ? parse : groqParse } } },
+      chat: { id: "unused", reasoningEffort: null },
+      router:
+        name === "openai"
+          ? { id: "router-test-model", reasoningEffort: null }
+          : { id: "openai/gpt-oss-20b", reasoningEffort: "low" }
+    }))
 }));
 
 const COMMENT_AI_HISTORY = [
@@ -35,7 +45,8 @@ function input(
 
 beforeEach(() => {
   parse.mockReset();
-  hasOpenAIConfig.mockReturnValue(false);
+  groqParse.mockReset();
+  providerNames.current = [];
 });
 
 afterEach(() => {
@@ -179,6 +190,11 @@ describe("messages during an active booking", () => {
       .toEqual({ intent: "profile", query: "What projects has he built?", via: "fast-path" });
   });
 
+  it("defers time requests phrased in minutes to the LLM", () => {
+    expect(fastPathRoute(input("Could we find fifteen minutes this week?"))).toBeNull();
+    expect(fastPathRoute(input("Does he have 10 mins tomorrow?"))).toBeNull();
+  });
+
   it("defers a question that mixes booking details and profile topics", async () => {
     const message = "Tomorrow works, and what projects has he built?";
     expect(fastPathRoute(input(message, "awaiting_day"))).toBeNull();
@@ -287,12 +303,12 @@ describe("follow-ups and the LLM classifier", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it("is unavailable without OpenAI config", () => {
+  it("is unavailable without any model provider", () => {
     expect(createLlmClassifier()).toBeNull();
   });
 
   it("asks the router model for a strict structured decision with context", async () => {
-    hasOpenAIConfig.mockReturnValue(true);
+    providerNames.current = ["openai"];
     parse.mockResolvedValue({
       choices: [
         {
@@ -348,8 +364,30 @@ describe("follow-ups and the LLM classifier", () => {
   });
 
   it("rejects a completion without a parsed decision", async () => {
-    hasOpenAIConfig.mockReturnValue(true);
+    providerNames.current = ["openai"];
     parse.mockResolvedValue({ choices: [{ message: { parsed: null, refusal: "no" } }] });
     await expect(createLlmClassifier()?.(input("Why?"))).rejects.toThrow("no decision");
+  });
+
+  it("asks Groq when the OpenAI router call fails", async () => {
+    providerNames.current = ["openai", "groq"];
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    parse.mockRejectedValue(new Error("401 Incorrect API key"));
+    groqParse.mockResolvedValue({
+      choices: [{ message: { parsed: { intent: "scheduling", standaloneQuestion: "" } } }]
+    });
+
+    const decision = await routeMessage(input("Could we find fifteen minutes this week?"));
+
+    expect(decision).toMatchObject({ intent: "scheduling", via: "llm" });
+    expect(groqParse.mock.calls[0][0]).toMatchObject({
+      model: "openai/gpt-oss-20b",
+      reasoning_effort: "low",
+      max_completion_tokens: 1024
+    });
+    expect(warn).toHaveBeenCalledWith(
+      "openai request failed; retrying with groq.",
+      expect.any(Error)
+    );
   });
 });

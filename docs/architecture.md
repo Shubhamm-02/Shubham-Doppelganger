@@ -69,8 +69,8 @@ SSE events (`lib/chat/types.ts`, encoded and parsed by `lib/chat/sse.ts`):
 `runChatTurn` then streams:
 
 6. `meta`, then routing (`lib/chat/router.ts`): a `book` / `check_day` action goes straight to
-   scheduling; otherwise a regex fast path, then an LLM classifier (`OPENAI_ROUTER_MODEL`, 4 s
-   timeout, structured output, rewrites follow-ups into standalone questions), then a heuristic
+   scheduling; otherwise a regex fast path, then an LLM classifier (`OPENAI_ROUTER_MODEL`, falling back to Groq; 4 s
+   timeout per provider, structured output, rewrites follow-ups into standalone questions), then a heuristic
    fallback when there is no key or the call fails. Intents: `profile`, `scheduling`,
    `cancel_scheduling`.
 7. Profile: `status searching`, retrieval, then the grounded answer streams as `token` events.
@@ -221,6 +221,9 @@ columns and `match_documents`.
 | `OPENAI_ROUTER_MODEL` | No | `lib/chat/router.ts` | `gpt-4.1-nano` | Intent classifier. |
 | `OPENAI_EMBEDDING_MODEL` | No | `lib/llm/client.ts`, `ingest:resume` | `text-embedding-3-small` | Must match the indexed embeddings. |
 | `OPENAI_EMBEDDING_DIMENSIONS` | No | `lib/llm/client.ts` | 1536 (3072 for `text-embedding-3-large` / `gemini-embedding-001`) | Must match `vector(...)` in the schema. |
+| `GROQ_API_KEY` | No | `lib/llm/client.ts`, `lib/llm/fallback.ts` | - | Groq answers and routes when OpenAI is unconfigured or a request fails before any text streams. No embeddings, so retrieval falls back to local search. |
+| `GROQ_CHAT_MODEL` | No | `lib/llm/client.ts` | `openai/gpt-oss-120b` | Fallback answers; gpt-oss models run with low reasoning effort. |
+| `GROQ_ROUTER_MODEL` | No | `lib/chat/router.ts` | `openai/gpt-oss-20b` | Fallback intent classifier; must support strict structured outputs. |
 | `SUPABASE_URL` | For persistence and vector search | `lib/supabase.ts` | - | |
 | `SUPABASE_SERVICE_ROLE_KEY` | With `SUPABASE_URL` | `lib/supabase.ts` | - | Secret key only; a publishable key is rejected. |
 | `UPSTASH_REDIS_REST_URL` | Recommended in production | `lib/rate-limit.ts` | - | Or `KV_REST_API_URL` (Vercel Marketplace). |

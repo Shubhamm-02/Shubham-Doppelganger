@@ -3,6 +3,10 @@ import {
   chatModel,
   embeddingModel,
   expectedEmbeddingDimensions,
+  getGroqClient,
+  groqChatModel,
+  groqRouterModel,
+  hasGroqConfig,
   hasOpenAIConfig,
   openAIBaseURL
 } from "@/lib/llm/client";
@@ -90,6 +94,13 @@ async function runChecks() {
       actualEmbeddingDimensions: null as number | null,
       error: null as string | null
     },
+    groq: {
+      configured: hasGroqConfig(),
+      chatModel: groqChatModel(),
+      routerModel: groqRouterModel(),
+      ok: false,
+      error: null as string | null
+    },
     supabase: {
       configured: hasSupabaseConfig(),
       ok: false,
@@ -115,6 +126,20 @@ async function runChecks() {
     }
   } else {
     checks.llm.error = "OPENAI_API_KEY is missing.";
+  }
+
+  if (checks.groq.configured) {
+    try {
+      const models = await withTimeout(getGroqClient().models.list(), 8000, "Groq model check");
+      const available = new Set(models.data.map((model) => model.id));
+      const missing = [checks.groq.chatModel, checks.groq.routerModel].filter(
+        (model) => !available.has(model)
+      );
+      checks.groq.ok = missing.length === 0;
+      if (missing.length > 0) checks.groq.error = `Groq does not serve: ${missing.join(", ")}.`;
+    } catch (error) {
+      checks.groq.error = errorMessage(error);
+    }
   }
 
   if (checks.supabase.configured) {

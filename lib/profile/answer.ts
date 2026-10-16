@@ -1,5 +1,5 @@
 import type { Source } from "@/lib/chat/types";
-import { hasOpenAIConfig } from "@/lib/llm/client";
+import { hasChatProvider, hasOpenAIConfig } from "@/lib/llm/client";
 import {
   isModelRefusal,
   REFUSAL,
@@ -141,7 +141,7 @@ export async function streamProfileAnswer(
 
   if (signal?.aborted) return stoppedAnswer(mode);
 
-  if (hasOpenAIConfig()) {
+  if (hasChatProvider()) {
     let emitted = false;
     try {
       const answer = await streamGroundedAnswer({

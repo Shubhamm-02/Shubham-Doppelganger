@@ -4,12 +4,16 @@ import type { RetrievedChunk } from "@/lib/retrieval/types";
 
 const mocks = vi.hoisted(() => ({
   hasOpenAIConfig: vi.fn(),
+  hasChatProvider: vi.fn(),
   hasSupabaseConfig: vi.fn(),
   retrieveVector: vi.fn(),
   streamGroundedAnswer: vi.fn()
 }));
 
-vi.mock("@/lib/llm/client", () => ({ hasOpenAIConfig: mocks.hasOpenAIConfig }));
+vi.mock("@/lib/llm/client", () => ({
+  hasOpenAIConfig: mocks.hasOpenAIConfig,
+  hasChatProvider: mocks.hasChatProvider
+}));
 vi.mock("@/lib/supabase", () => ({ hasSupabaseConfig: mocks.hasSupabaseConfig }));
 vi.mock("@/lib/retrieval/vector", () => ({ retrieveVector: mocks.retrieveVector }));
 vi.mock("@/lib/llm/grounded-answer", async (importOriginal) => ({
@@ -38,8 +42,17 @@ const vectorChunk: RetrievedChunk = {
   score: 0.71
 };
 
-function configure({ openAI, supabase }: { openAI: boolean; supabase: boolean }) {
+function configure({
+  openAI,
+  groq = false,
+  supabase
+}: {
+  openAI: boolean;
+  groq?: boolean;
+  supabase: boolean;
+}) {
   mocks.hasOpenAIConfig.mockReturnValue(openAI);
+  mocks.hasChatProvider.mockReturnValue(openAI || groq);
   mocks.hasSupabaseConfig.mockReturnValue(supabase);
 }
 
@@ -90,6 +103,23 @@ describe("streamProfileAnswer", () => {
     expect(result.answer).not.toMatch(/:\n#{1,6} /);
     expect(result).toMatchObject({ grounded: true, retrievalMode: "local-keyword", documentIds: [] });
     expect(result.sources[0].path).toBe("data/project-notes/comment-ai.md");
+  });
+
+  it("generates with the fallback model over local search when only Groq is configured", async () => {
+    configure({ openAI: false, groq: true, supabase: true });
+    llmAnswers(["Guardrails", " cap comment volume."]);
+
+    const { result } = await collect("What anti-spam guardrails are in CommentAI?", {
+      style: "chat"
+    });
+
+    expect(mocks.retrieveVector).not.toHaveBeenCalled();
+    expect(mocks.streamGroundedAnswer).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      answer: "Guardrails cap comment volume.",
+      grounded: true,
+      retrievalMode: "local-keyword"
+    });
   });
 
   it("uses the vector RPC for chat when OpenAI and Supabase are configured", async () => {

@@ -1,7 +1,8 @@
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import type { SchedulingStep } from "@/lib/chat/types";
-import { getOpenAIClient, hasOpenAIConfig, routerModel } from "@/lib/llm/client";
+import { hasChatProvider, reasoningParams } from "@/lib/llm/client";
+import { withChatProviderFallback } from "@/lib/llm/fallback";
 
 export type RouteInput = {
   message: string;
@@ -25,6 +26,8 @@ export type Classifier = (
 
 const ROUTER_TIMEOUT_MS = 4000;
 const ROUTER_MAX_TOKENS = 150;
+// Reasoning tokens count against the completion budget, so reasoning models need room to think.
+const REASONING_ROUTER_MAX_TOKENS = 1024;
 const ROUTER_HISTORY_TURNS = 3;
 const ASSISTANT_CONTEXT_CHARS = 300;
 const SHORT_REPLY_WORDS = 6;
@@ -70,7 +73,7 @@ const AVAILABILITY_PERIOD =
   /^ (?:(?:sometime |some time )?(?:later )?(?:this|next) (?:week|weekend)|sometime|some time|at some point|any ?time|soon)\b/;
 
 const SCHEDULING_VOCABULARY =
-  /\b(?:call|calls|meet|meeting|meetings|interview|interviews|available|availability|free|schedule|scheduling|calendar|slots?|book|booking|appointment|talk|speak|chat)\b/;
+  /\b(?:call|calls|meet|meeting|meetings|interview|interviews|available|availability|free|schedule|scheduling|calendar|slots?|book|booking|appointment|talk|speak|chat|mins?|minutes?)\b/;
 const PROFILE_TOPIC =
   /\b(?:projects?|resume|cv|skills?|experience|github|linkedin|education|college|universit(?:y|ies)|degree|intern|internships?|tech stack|built|build|building|portfolio|background|studied|achievements?|hackathons?|frameworks?|programming|languages?|repos?|repositor(?:y|ies)|strengths?|worked|work on|working on|certifications?|tell me (?:more )?about|who is)\b/;
 const FOLLOW_UP =
@@ -215,28 +218,35 @@ function routerSystemPrompt(input: RouteInput) {
 }
 
 export function createLlmClassifier(): Classifier | null {
-  if (!hasOpenAIConfig()) return null;
+  if (!hasChatProvider()) return null;
 
-  return async (input, signal) => {
-    const timeout = AbortSignal.timeout(ROUTER_TIMEOUT_MS);
-    const completion = await getOpenAIClient().chat.completions.parse(
-      {
-        model: routerModel(),
-        temperature: 0,
-        max_completion_tokens: ROUTER_MAX_TOKENS,
-        response_format: zodResponseFormat(routeSchema, "route"),
-        messages: [
-          { role: "system", content: routerSystemPrompt(input) },
-          { role: "user", content: input.message }
-        ]
+  return (input, signal) =>
+    withChatProviderFallback(
+      async (provider) => {
+        const timeout = AbortSignal.timeout(ROUTER_TIMEOUT_MS);
+        const completion = await provider.client.chat.completions.parse(
+          {
+            model: provider.router.id,
+            ...reasoningParams(provider.router),
+            temperature: 0,
+            max_completion_tokens: provider.router.reasoningEffort
+              ? REASONING_ROUTER_MAX_TOKENS
+              : ROUTER_MAX_TOKENS,
+            response_format: zodResponseFormat(routeSchema, "route"),
+            messages: [
+              { role: "system", content: routerSystemPrompt(input) },
+              { role: "user", content: input.message }
+            ]
+          },
+          { signal: signal ? AbortSignal.any([signal, timeout]) : timeout, maxRetries: 0 }
+        );
+
+        const parsed = completion.choices[0]?.message.parsed;
+        if (!parsed) throw new Error("Router returned no decision.");
+        return parsed;
       },
-      { signal: signal ? AbortSignal.any([signal, timeout]) : timeout, maxRetries: 0 }
+      { signal }
     );
-
-    const parsed = completion.choices[0]?.message.parsed;
-    if (!parsed) throw new Error("Router returned no decision.");
-    return parsed;
-  };
 }
 
 export async function routeMessage(

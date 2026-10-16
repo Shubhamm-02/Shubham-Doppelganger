@@ -1,11 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RetrievedChunk } from "@/lib/retrieval/types";
 
-const { create } = vi.hoisted(() => ({ create: vi.fn() }));
+const { create, groqCreate, providerNames } = vi.hoisted(() => ({
+  create: vi.fn(),
+  groqCreate: vi.fn(),
+  providerNames: { current: ["openai"] as Array<"openai" | "groq"> }
+}));
 
-vi.mock("@/lib/llm/client", () => ({
-  chatModel: () => "test-chat-model",
-  getOpenAIClient: () => ({ chat: { completions: { create } } })
+vi.mock("@/lib/llm/client", async (importOriginal) => ({
+  reasoningParams: (await importOriginal<typeof import("@/lib/llm/client")>()).reasoningParams,
+  chatProviders: () =>
+    providerNames.current.map((name) => ({
+      name,
+      client: { chat: { completions: { create: name === "openai" ? create : groqCreate } } },
+      chat:
+        name === "openai"
+          ? { id: "test-chat-model", reasoningEffort: null }
+          : { id: "openai/gpt-oss-120b", reasoningEffort: "low" },
+      router: { id: "unused", reasoningEffort: null }
+    }))
 }));
 
 import { isModelRefusal, REFUSAL, streamGroundedAnswer } from "@/lib/llm/grounded-answer";
@@ -40,6 +53,9 @@ function sentPrompt() {
 
 beforeEach(() => {
   create.mockReset();
+  groqCreate.mockReset();
+  providerNames.current = ["openai"];
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
 });
 
 describe("streamGroundedAnswer", () => {
@@ -129,5 +145,74 @@ describe("streamGroundedAnswer", () => {
     await expect(
       streamGroundedAnswer({ question: "Q", documents, style: "chat", onToken: () => {} })
     ).rejects.toThrow("upstream down");
+  });
+
+  it("answers with Groq when OpenAI fails before streaming", async () => {
+    providerNames.current = ["openai", "groq"];
+    create.mockRejectedValue(new Error("401 Incorrect API key"));
+    groqCreate.mockImplementation(async () => streamOf(["From", " Groq"]));
+    const tokens: string[] = [];
+
+    const answer = await streamGroundedAnswer({
+      question: "Q",
+      documents,
+      style: "chat",
+      onToken: (token) => {
+        tokens.push(token);
+      }
+    });
+
+    expect(answer).toBe("From Groq");
+    expect(tokens).toEqual(["From", " Groq"]);
+    expect(groqCreate.mock.calls[0][0]).toMatchObject({
+      model: "openai/gpt-oss-120b",
+      reasoning_effort: "low"
+    });
+    expect(create.mock.calls[0][0]).not.toHaveProperty("reasoning_effort");
+  });
+
+  it("uses Groq alone when OpenAI is not configured", async () => {
+    providerNames.current = ["groq"];
+    groqCreate.mockImplementation(async () => streamOf(["Only Groq"]));
+
+    const answer = await streamGroundedAnswer({ question: "Q", documents, style: "voice", onToken: () => {} });
+
+    expect(answer).toBe("Only Groq");
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("does not switch providers once tokens have been emitted", async () => {
+    providerNames.current = ["openai", "groq"];
+    create.mockImplementation(async () =>
+      (async function* () {
+        yield { choices: [{ delta: { content: "Half" } }] };
+        throw new Error("connection reset");
+      })()
+    );
+
+    await expect(
+      streamGroundedAnswer({ question: "Q", documents, style: "chat", onToken: () => {} })
+    ).rejects.toThrow("connection reset");
+    expect(groqCreate).not.toHaveBeenCalled();
+  });
+
+  it("does not switch providers after an abort", async () => {
+    providerNames.current = ["openai", "groq"];
+    const controller = new AbortController();
+    create.mockImplementation(async () => {
+      controller.abort();
+      throw new Error("Request was aborted.");
+    });
+
+    const answer = await streamGroundedAnswer({
+      question: "Q",
+      documents,
+      style: "chat",
+      signal: controller.signal,
+      onToken: () => {}
+    });
+
+    expect(answer).toBe("");
+    expect(groqCreate).not.toHaveBeenCalled();
   });
 });
