@@ -8,7 +8,7 @@ const SUGGESTED_QUESTIONS = [
   "What's the most complex system he's built end to end?",
   "How does he keep LLM answers grounded?",
   "What backend work has he done outside of AI?",
-  "Where is he studying, and how are his grades?"
+  "What has he built recently?"
 ];
 
 export type EmptyStateProps = {

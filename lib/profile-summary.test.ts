@@ -9,12 +9,21 @@ describe("parseProfileSummary", () => {
   it("derives the landing summary from the resume", () => {
     expect(parseProfileSummary(resume)).toEqual({
       name: "Shubham Shah",
-      positioning: "AI/ML engineer building LLM agents and RAG systems",
+      positioning: "Software engineer focused on AI/ML, LLM systems, and full-stack development",
       highlights: [
-        { label: "CommentAI", detail: "Autonomous AI agent; guardrails cut spam/irrelevant outputs by ~40%" },
-        { label: "CCPA compliance AI system", detail: "Indexed 10k+ legal text chunks; retrieval precision up ~20%" },
-        { label: "PDF grounded chatbot", detail: "Answers strictly from uploaded PDFs, with page-number citations" },
-        { label: "CGPA 9.6 / 10", detail: "BITS Pilani Digital + Scaler School of Technology" }
+        {
+          label: "HACKHAZARDS '26",
+          detail: "Placed 5th overall and 3rd in the Neo4j Track with BlastRadius, among 2,657 submissions"
+        },
+        { label: "TRAE Hackathon", detail: "1st place in the Nasiko Track with an agent load balancing system" },
+        {
+          label: "Galaxy AI Workflow Builder",
+          detail: "Typed DAG validation, full/single/partial workflow runs, and background execution"
+        },
+        {
+          label: "BITS Pilani Digital + Scaler School of Technology",
+          detail: "B.Sc. in Computer Science Engineering + M.Sc. from Woolf University"
+        }
       ],
       links: {
         github: "https://github.com/shubhamm-02",
@@ -26,19 +35,26 @@ describe("parseProfileSummary", () => {
 
   it("only uses figures that appear in the resume", () => {
     for (const { label, detail } of parseProfileSummary(resume).highlights) {
-      for (const figure of `${label} ${detail}`.match(/~?\d[\d.k+]*%?/g) ?? []) {
+      for (const figure of `${label} ${detail}`.match(/~?\d[\d.,k+]*%?/g) ?? []) {
         expect(resume).toContain(figure);
       }
     }
   });
 
-  it("fails loudly when a highlight's source disappears", () => {
-    const withoutCcpa = resume.replace(/### CCPA[\s\S]*?(?=### )/, "");
-    expect(() => parseProfileSummary(withoutCcpa)).toThrow(/project "CCPA"/);
+  it("states no grades", () => {
+    const summary = JSON.stringify(parseProfileSummary(resume));
+    expect(summary).not.toMatch(/cgpa|cgr|gpa/i);
   });
 
-  it("fails loudly when a metric is reworded", () => {
-    expect(() => parseProfileSummary(resume.replace("reducing spam", "cutting spam"))).toThrow(/CommentAI/);
+  it("fails loudly when a highlight's source disappears", () => {
+    const withoutHackhazards = resume.replace(/### HACKHAZARDS[\s\S]*?(?=### )/, "");
+    expect(() => parseProfileSummary(withoutHackhazards)).toThrow(/entry "HACKHAZARDS"/);
+  });
+
+  it("fails loudly when a detail is reworded", () => {
+    expect(() =>
+      parseProfileSummary(resume.replace("final project submissions", "project entries"))
+    ).toThrow(/HACKHAZARDS/);
   });
 });
 

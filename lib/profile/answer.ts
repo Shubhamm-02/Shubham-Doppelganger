@@ -15,6 +15,7 @@ import {
 } from "@/lib/profile/local-search";
 import { projectDigest, recentRepos, recentWorkDigest } from "@/lib/profile/project-digest";
 import {
+  isGradeQuestion,
   isProfileOverviewQuestion,
   isProjectListQuestion,
   isRecentWorkQuestion,
@@ -43,6 +44,10 @@ export type ProfileAnswerOptions = {
 };
 
 type TokenSink = (token: string) => void | Promise<void>;
+
+// Shubham shares grades himself, so these get a pointer to him instead of a refusal.
+const GRADES_ANSWER =
+  "Shubham prefers to share his grades directly rather than through me. You can ask him on a 15-minute call, or ask me about his degrees, projects, or skills.";
 
 const LOCAL_CONTEXT_LIMIT: Record<AnswerStyle, number> = { chat: 7, voice: 6 };
 const FALLBACK_CHUNK_LIMIT = 4;
@@ -113,6 +118,20 @@ export async function streamProfileAnswer(
   { style, history, signal, onToken }: ProfileAnswerOptions & { onToken: TokenSink }
 ): Promise<ProfileAnswer> {
   const normalizedQuestion = normalizeProfileQuestion(question);
+
+  if (isGradeQuestion(normalizedQuestion)) {
+    return deliver(
+      {
+        answer: GRADES_ANSWER,
+        sources: [],
+        grounded: true,
+        retrievalMode: "local-keyword",
+        documentIds: []
+      },
+      onToken,
+      signal
+    );
+  }
 
   if (!isWizardProjectQuestion(normalizedQuestion)) {
     const repos = recentRepos(githubChunks());

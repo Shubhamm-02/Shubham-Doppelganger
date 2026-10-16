@@ -10,7 +10,7 @@ export type ProfileSummary = {
   links: { github: string; linkedin: string; email: string };
 };
 
-type Project = { title: string; bullets: string[] };
+type Entry = { title: string; bullets: string[] };
 
 const RESUME_PATH = path.join(process.cwd(), "data", "resume.md");
 
@@ -24,15 +24,16 @@ export function getProfileSummary() {
 export function parseProfileSummary(markdown: string): ProfileSummary {
   const sections = splitSections(markdown);
   const header = sections.get("") ?? "";
-  const projects = parseProjects(sections.get("Projects") ?? "");
+  const achievements = parseEntries(sections.get("Achievements") ?? "");
+  const projects = parseEntries(sections.get("Projects") ?? "");
 
   return {
     name: required(header.match(/^#\s+(.+)$/m), "name")[1].trim(),
     positioning: positioningFrom(required(header.match(/^\*\*(.+\|.+)\*\*\s*$/m), "headline")[1]),
     highlights: [
-      commentAiHighlight(projects),
-      ccpaHighlight(projects),
-      pdfChatbotHighlight(projects),
+      hackathonRankHighlight(achievements),
+      hackathonWinHighlight(achievements),
+      workflowBuilderHighlight(projects),
       educationHighlight(sections.get("Education") ?? "")
     ],
     links: {
@@ -54,7 +55,7 @@ function splitSections(markdown: string) {
   return sections;
 }
 
-function parseProjects(section: string): Project[] {
+function parseEntries(section: string): Entry[] {
   return section
     .split(/^### /m)
     .slice(1)
@@ -67,60 +68,77 @@ function parseProjects(section: string): Project[] {
     });
 }
 
-function findProject(projects: Project[], prefix: string) {
+function findEntry(entries: Entry[], prefix: string) {
   return required(
-    projects.find((project) => project.title.startsWith(prefix)),
-    `project "${prefix}"`
+    entries.find((entry) => entry.title.startsWith(prefix)),
+    `entry "${prefix}"`
   );
 }
 
-function findInBullets(project: Project, pattern: RegExp) {
-  for (const bullet of project.bullets) {
+function findInBullets(entry: Entry, pattern: RegExp) {
+  for (const bullet of entry.bullets) {
     const match = bullet.match(pattern);
     if (match) return match;
   }
-  throw new Error(`resume.md: no bullet in "${project.title}" matches ${pattern}`);
+  throw new Error(`resume.md: no bullet in "${entry.title}" matches ${pattern}`);
 }
 
-function commentAiHighlight(projects: Project[]): ProfileHighlight {
-  const project = findProject(projects, "CommentAI");
-  const [name, kind] = project.title.split(/\s+—\s+|\s+\(/);
-  const [, outputs, amount] = findInBullets(project, /guardrails.*reducing (.+?) by \*\*(.+?)\*\*/);
-  return { label: name, detail: `${sentenceCase(kind)}; guardrails cut ${outputs} by ${amount}` };
+function hackathonRankHighlight(achievements: Entry[]): ProfileHighlight {
+  const entry = findEntry(achievements, "HACKHAZARDS");
+  const [, placing, project, submissions] = findInBullets(
+    entry,
+    /^Placed (.+?) with \*\*(.+?)\*\*.*? among \*\*(.+?)\*\* final project submissions/
+  );
+  return {
+    label: entry.title.split(":")[0],
+    detail: `Placed ${placing} with ${project}, among ${submissions} submissions`
+  };
 }
 
-function ccpaHighlight(projects: Project[]): ProfileHighlight {
-  const project = findProject(projects, "CCPA");
-  const [, chunks, precision] = findInBullets(project, /Indexed \*\*(.+?)\*\*.*retrieval precision by \*\*(.+?)\*\*/);
-  return { label: sentenceCase(titleName(project)), detail: `Indexed ${chunks}; retrieval precision up ${precision}` };
+function hackathonWinHighlight(achievements: Entry[]): ProfileHighlight {
+  const entry = findEntry(achievements, "1st Place");
+  const [, event, track] = required(
+    entry.title.match(/^1st Place, .*? with (.+?) \((.+?)\)$/),
+    "hackathon win"
+  );
+  const [, system] = findInBullets(entry, /^Built an? (.+?) for /);
+  return { label: event, detail: `1st place in the ${track} with an ${system}` };
 }
 
-function pdfChatbotHighlight(projects: Project[]): ProfileHighlight {
-  const project = findProject(projects, "PDF Grounded Chatbot");
-  const [, scope, citations] = findInBullets(project, /answers questions (strictly from uploaded PDFs) with (.+?)\.?$/);
-  return { label: sentenceCase(titleName(project)), detail: `Answers ${scope}, with ${citations}` };
+function workflowBuilderHighlight(projects: Entry[]): ProfileHighlight {
+  const entry = findEntry(projects, "Galaxy AI Workflow Builder");
+  const [, validation, runs] = findInBullets(
+    entry,
+    /^Implemented typed \*\*(.+?)\*\*, (full\/single\/partial workflow runs)/
+  );
+  return {
+    label: entry.title.replace(/ Clone$/, ""),
+    detail: `Typed ${validation}, ${runs}, and background execution`
+  };
 }
 
 function educationHighlight(section: string): ProfileHighlight {
-  const school = required(section.match(/^\*\*(.+?)\*\*\s*$/m), "school")[1];
-  const [, score, scale] = required(section.match(/\*\*CGPA:\s*([\d.]+)\s*\/\s*([\d.]+)\*\*/), "CGPA");
-  return { label: `CGPA ${Number(score)} / ${Number(scale)}`, detail: school };
+  const schools = Array.from(section.matchAll(/^\*\*(.+?)\*\*\s*$/gm), (match) => match[1]);
+  const degrees = section
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => /^(?:B|M)\.Sc\./.test(line));
+  if (schools.length < 2 || degrees.length < 2) throw new Error("resume.md: could not find both programmes");
+  return { label: schools.join(" + "), detail: degrees.join(" + ") };
 }
 
+// "Software Engineer | AI/ML Engineer | LLM Systems" → "Software engineer focused on AI/ML and LLM systems"
 function positioningFrom(headline: string) {
-  const [role, focus] = headline.split("|").map((part) => sentenceCase(part.trim()));
-  return `${role} building ${focus.replace(" & ", " and ")}`;
+  const [role, ...focuses] = headline.split("|").map((part) => lowerCommonWords(part.trim()));
+  const areas = focuses.map((focus) => focus.replace(/\s+engineer$/, ""));
+  const list =
+    areas.length > 2 ? `${areas.slice(0, -1).join(", ")}, and ${areas.at(-1)}` : areas.join(" and ");
+  return `${role.charAt(0).toUpperCase()}${role.slice(1)} focused on ${list}`;
 }
 
-function titleName(project: Project) {
-  return project.title.split(/\s+\(|\s+—\s+/)[0];
-}
-
-function sentenceCase(text: string) {
-  return text
-    .split(" ")
-    .map((word, index) => (index > 0 && /^[A-Z][a-z]+$/.test(word) ? word.toLowerCase() : word))
-    .join(" ");
+// Lowercases ordinary capitalised words and keeps acronyms such as AI/ML or LLM.
+function lowerCommonWords(text: string) {
+  return text.replace(/\b[A-Z][a-z]+(?:-[A-Z][a-z]+)*\b/g, (word) => word.toLowerCase());
 }
 
 function required<T>(value: T | null | undefined, what: string): T {
